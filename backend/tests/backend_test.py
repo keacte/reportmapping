@@ -144,3 +144,86 @@ class TestRecentReports:
             assert by_id[622]["name"] == "K-FLEET: ShrinkWrapped pew pew!"
         else:
             pytest.skip("report 622 no longer in recent feed")
+
+
+
+# --- Iteration 3: /api/report/combined ---
+class TestCombinedReport:
+    @pytest.fixture(scope="class")
+    def recent_ids(self):
+        r = requests.get(f"{API}/reports/recent", timeout=60)
+        assert r.status_code == 200
+        ids = [rep["id"] for rep in r.json().get("reports", [])][:3]
+        assert len(ids) >= 2, f"need at least 2 recent report ids, got {ids}"
+        return ids
+
+    @pytest.fixture(scope="class")
+    def combined(self, recent_ids):
+        r = requests.get(f"{API}/report/combined", params={"ids": ",".join(str(i) for i in recent_ids)}, timeout=90)
+        assert r.status_code == 200, f"combined failed: {r.status_code} {r.text[:300]}"
+        return r.json(), recent_ids
+
+    def test_combined_shape(self, combined):
+        data, ids = combined
+        assert data["combined"] is True
+        assert data["fleet"]["name"] == f"Combined \u00b7 {len(ids)} fleets"
+        assert isinstance(data["fleets"], list)
+        assert len(data["fleets"]) == len(ids)
+        for f in data["fleets"]:
+            for k in ("id", "name", "color", "kills", "iskHuman"):
+                assert k in f, f"missing {k} in fleets meta"
+
+    def test_combined_totals_sum(self, combined):
+        data, _ = combined
+        total = sum(f["kills"] for f in data["fleets"])
+        assert data["totalKills"] == total == len(data["kills"])
+
+    def test_combined_member_union(self, combined):
+        data, _ = combined
+        assert data["fleet"]["memberCount"] == len(data["members"])
+        # union => members are unique by id
+        ids = [m.get("id") for m in data["members"]]
+        assert len(ids) == len(set(ids))
+
+    def test_combined_kill_tags(self, combined):
+        data, _ = combined
+        fleet_ids = {f["id"] for f in data["fleets"]}
+        for k in data["kills"]:
+            assert "color" in k and "fleetId" in k and "fleetName" in k
+            assert k["fleetId"] in fleet_ids
+
+    def test_combined_aggregates_present(self, combined):
+        data, _ = combined
+        assert isinstance(data["hotspots"], list)
+        assert isinstance(data["regionStats"], list)
+        assert isinstance(data["shipBreakdown"], list)
+        # sanity: shipBreakdown counts sum to totalKills
+        assert sum(e["count"] for e in data["shipBreakdown"]) == data["totalKills"]
+
+    def test_combined_isk_sum_human(self, combined):
+        data, _ = combined
+        # fleet.destroyedValueHuman is a string ending in k/m/b/t or digits
+        v = data["fleet"]["destroyedValueHuman"]
+        assert isinstance(v, str) and len(v) > 0
+
+    def test_combined_single_id(self, recent_ids):
+        one = recent_ids[0]
+        r = requests.get(f"{API}/report/combined", params={"ids": str(one)}, timeout=60)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["combined"] is True
+        assert len(d["fleets"]) == 1
+
+    def test_combined_invalid_id_returns_404(self, recent_ids):
+        r = requests.get(f"{API}/report/combined", params={"ids": f"{recent_ids[0]},99999999"}, timeout=60)
+        assert r.status_code == 404
+
+    def test_combined_empty_returns_400(self):
+        r = requests.get(f"{API}/report/combined", params={"ids": ""}, timeout=30)
+        assert r.status_code == 400
+
+
+# --- Iteration 3 regression: report 622 combined flag ---
+class TestReport622Combined:
+    def test_combined_flag_false(self, report_622):
+        assert report_622.get("combined") is False

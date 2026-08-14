@@ -28,6 +28,7 @@ export default function FleetMap() {
   const [recentOpen, setRecentOpen] = useState(false);
   const [showTimeline, setShowTimeline] = useState(true);
   const [focusRegion, setFocusRegion] = useState(null);
+  const [groupIds, setGroupIds] = useState([]);
 
   const regionByName = useMemo(() => {
     const m = {};
@@ -44,18 +45,30 @@ export default function FleetMap() {
     }).catch(() => {});
   }, []);
 
-  const loadReport = useCallback((id) => {
+  const loadUrl = useCallback((url) => {
     setLoading(true);
     setError(null);
     setSelected(null);
     axios
-      .get(`${API}/report/${id}`)
+      .get(url)
       .then((r) => setReport(r.data))
       .catch((e) => setError(e?.response?.data?.detail || "Failed to load fleet report"))
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { loadReport(reportId); }, [reportId, loadReport]);
+  const loadReport = useCallback((id) => loadUrl(`${API}/report/${id}`), [loadUrl]);
+
+  const loadCombined = useCallback((ids) => {
+    if (!ids || ids.length < 2) return;
+    setRecentOpen(false);
+    loadUrl(`${API}/report/combined?ids=${ids.join(",")}`);
+  }, [loadUrl]);
+
+  useEffect(() => { loadReport("622"); }, [loadReport]);
+
+  const toggleGroup = useCallback((id) => {
+    setGroupIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }, []);
 
   const hotspots = useMemo(() => report?.hotspots || [], [report]);
 
@@ -68,7 +81,9 @@ export default function FleetMap() {
   const submit = (e) => {
     e.preventDefault();
     const id = inputId.trim();
-    if (id) setReportId(id);
+    if (!id) return;
+    setReportId(id);
+    loadReport(id);
   };
 
   const onHover = useCallback((hs, x, y) => {
@@ -144,7 +159,11 @@ export default function FleetMap() {
         reports={recent}
         stats={recentStats}
         currentId={reportId}
-        onPick={(id) => { setInputId(String(id)); setReportId(String(id)); setRecentOpen(false); }}
+        onPick={(id) => { setInputId(String(id)); setReportId(String(id)); loadReport(id); setRecentOpen(false); }}
+        groupIds={groupIds}
+        onToggleGroup={toggleGroup}
+        onCombine={loadCombined}
+        onClearGroup={() => setGroupIds([])}
       />
 
       {/* Left summary panel */}
@@ -156,15 +175,39 @@ export default function FleetMap() {
           className="thin-scroll absolute left-4 top-24 z-20 w-[22rem] max-h-[calc(100vh-8rem)] overflow-y-auto glass rounded-2xl p-5"
           data-testid="summary-panel"
         >
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400">Fleet Report</div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400">{report.combined ? "Combined Report" : "Fleet Report"}</div>
           <h1 className="mt-1 font-display text-2xl font-bold leading-tight text-white" data-testid="fleet-name">{f.name}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-slate-400">
-            <a href={hostUrl(f.providerSlug)} target="_blank" rel="noopener noreferrer" className="text-blue-300/90 hover:text-blue-200">{f.providerName}</a>
+            {report.combined ? (
+              <span className="text-blue-300/90">{f.providerName}</span>
+            ) : (
+              <a href={hostUrl(f.providerSlug)} target="_blank" rel="noopener noreferrer" className="text-blue-300/90 hover:text-blue-200">{f.providerName}</a>
+            )}
             <span>·</span>
             <span>{f.start ? new Date(f.start).toLocaleDateString() : ""}</span>
-            <span>·</span>
-            <span>{f.durationText}</span>
+            {f.durationText && (<><span>·</span><span>{f.durationText}</span></>)}
           </div>
+
+          {report.combined && report.fleets && (
+            <div className="mt-3" data-testid="combined-fleets">
+              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400">Fleets in Report</div>
+              <div className="space-y-1">
+                {report.fleets.map((fl) => (
+                  <div key={fl.id} className="flex items-center gap-2 border border-white/10 bg-white/[0.02] p-1.5 rounded-lg" data-testid={`combined-fleet-${fl.id}`}>
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: fl.color, boxShadow: `0 0 8px ${fl.color}` }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-display text-xs font-semibold text-white">{fl.name}</div>
+                      <div className="truncate font-mono text-[9px] text-slate-400">{fl.providerName}</div>
+                    </div>
+                    <div className="shrink-0 text-right font-mono text-[10px]">
+                      <div className="text-slate-300">{fl.kills} kills</div>
+                      <div className="text-blue-300">{fl.iskHuman}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {f.fc && (
             <a href={capsuleerUrl(f.fc.id)} target="_blank" rel="noopener noreferrer" className="mt-3 flex items-center gap-2.5 border border-white/10 bg-white/[0.03] p-2 transition-colors hover:border-purple-400/40">
@@ -414,6 +457,9 @@ function ShipsPanel({ report, onFocus }) {
 function KillRow({ k, onFocus }) {
   return (
     <div className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.03] fade-up" data-testid={`kill-${k.killId}`}>
+      {k.color && (
+        <span className="h-8 w-1 shrink-0 rounded-full" style={{ background: k.color, boxShadow: `0 0 8px ${k.color}` }} title={k.fleetName} />
+      )}
       <a href={killUrl(k.killId)} target="_blank" rel="noopener noreferrer" className="relative shrink-0">
         <img src={shipRender(k.ship.id, 64)} alt={k.ship.name} className="h-11 w-11 border border-white/10 bg-black/40" />
       </a>

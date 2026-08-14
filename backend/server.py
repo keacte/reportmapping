@@ -2,9 +2,9 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
+import asyncio
 import logging
 from pathlib import Path
-from collections import defaultdict
 import httpx
 
 import eve_sde
@@ -95,90 +95,190 @@ def _pilot(node: dict | None) -> dict | None:
     }
 
 
-@api_router.get("/report/{report_id}")
-async def get_report(report_id: int):
-    """Fetch an NPSI fleet report live and map every kill onto SDE coordinates."""
+FLEET_COLORS = ["#a855f7", "#3b82f6", "#22c55e", "#f59e0b", "#ec4899", "#14b8a6", "#ef4444", "#eab308"]
+
+
+def _human_isk(v: float) -> str:
+    n = float(v or 0)
+    if n >= 1e12:
+        return f"{n / 1e12:.2f}t"
+    if n >= 1e9:
+        return f"{n / 1e9:.2f}b"
+    if n >= 1e6:
+        return f"{n / 1e6:.1f}m"
+    if n >= 1e3:
+        return f"{n / 1e3:.0f}k"
+    return str(round(n))
+
+
+def _kill_record(k: dict, fleet: dict | None = None) -> dict:
+    loc = k.get("location") or {}
+    sys_name = loc.get("name")
+    coord = eve_sde.resolve(sys_name) if sys_name else None
+    ship = k.get("ship") or {}
+    rec = {
+        "killId": k.get("killId"),
+        "timestamp": k.get("timestamp"),
+        "value": k.get("value") or 0,
+        "valueHuman": k.get("valueHuman"),
+        "system": sys_name,
+        "region": loc.get("region"),
+        "security": coord["security"] if coord else None,
+        "x": coord["x"] if coord else None,
+        "z": coord["z"] if coord else None,
+        "ship": {"id": ship.get("id"), "name": ship.get("name"), "group": eve_sde.ship_group(ship.get("id"))},
+        "victim": _pilot(k.get("victim")),
+        "topDamage": _pilot(k.get("topDamage")),
+        "finalBlow": _pilot(k.get("finalBlow")),
+    }
+    if fleet is not None:
+        rec["fleetId"] = fleet.get("id")
+        rec["fleetName"] = fleet.get("name")
+        rec["color"] = fleet.get("color")
+    return rec
+
+
+def _aggregate(records: list[dict]) -> dict:
+    """Build hotspots, ship breakdown and region stats from kill records."""
+    hotspots: dict[str, dict] = {}
+    groups: dict[str, dict] = {}
+    regions: dict[str, dict] = {}
+    unmapped = set()
+
+    for rec in records:
+        sys_name = rec["system"]
+        if sys_name and rec["x"] is None:
+            unmapped.add(sys_name)
+
+        gname = rec["ship"]["group"] or "Unknown"
+        g = groups.get(gname) or groups.setdefault(gname, {"group": gname, "count": 0, "isk": 0})
+        g["count"] += 1
+        g["isk"] += rec["value"]
+
+        region = rec["region"] or "Unknown"
+        rs = regions.get(region) or regions.setdefault(region, {"regionName": region, "killmails": 0, "_isk": 0})
+        rs["killmails"] += 1
+        rs["_isk"] += rec["value"]
+
+        if sys_name and rec["x"] is not None:
+            hs = hotspots.get(sys_name)
+            if hs is None:
+                hs = hotspots[sys_name] = {
+                    "system": sys_name, "region": rec["region"],
+                    "x": rec["x"], "z": rec["z"], "security": rec["security"],
+                    "kills": 0, "iskDestroyed": 0, "killIds": [],
+                }
+            hs["kills"] += 1
+            hs["iskDestroyed"] += rec["value"]
+            hs["killIds"].append(rec["killId"])
+
+    region_stats = sorted(regions.values(), key=lambda d: d["killmails"], reverse=True)
+    for rs in region_stats:
+        rs["destroyedValueHuman"] = _human_isk(rs.pop("_isk"))
+
+    return {
+        "hotspots": sorted(hotspots.values(), key=lambda h: h["iskDestroyed"], reverse=True),
+        "shipBreakdown": sorted(groups.values(), key=lambda d: (d["count"], d["isk"]), reverse=True),
+        "regionStats": region_stats,
+        "unmappedSystems": sorted(unmapped),
+    }
+
+
+async def _fetch_npsi_report(report_id: int) -> dict:
     url = f"{NPSI_API}/{report_id}/"
     try:
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             resp = await client.get(url, headers={"Accept": "application/json"})
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Failed to reach NPSI: {exc}")
-
     if resp.status_code == 404:
         raise HTTPException(status_code=404, detail=f"Fleet report {report_id} not found")
     if resp.status_code != 200:
         raise HTTPException(status_code=502, detail=f"NPSI returned {resp.status_code}")
-
     try:
-        data = resp.json()
+        return resp.json()
     except ValueError:
         raise HTTPException(status_code=502, detail="NPSI response was not JSON")
 
-    kills = data.get("kills", []) or []
 
-    # Build per-kill records joined with SDE coordinates.
-    kill_records = []
-    hotspots: dict[str, dict] = {}
-    unmapped = set()
+@api_router.get("/report/combined")
+async def combined_report(ids: str):
+    """Merge several NPSI fleet reports into one aggregated report + map."""
+    id_list = []
+    for part in ids.split(","):
+        part = part.strip()
+        if part.isdigit() and int(part) not in id_list:
+            id_list.append(int(part))
+    id_list = id_list[:8]
+    if len(id_list) < 1:
+        raise HTTPException(status_code=400, detail="Provide at least one report id")
 
-    for k in kills:
-        loc = k.get("location") or {}
-        sys_name = loc.get("name")
-        region = loc.get("region")
-        coord = eve_sde.resolve(sys_name) if sys_name else None
-        if coord is None and sys_name:
-            unmapped.add(sys_name)
+    datas = await asyncio.gather(*[_fetch_npsi_report(i) for i in id_list])
 
-        ship = k.get("ship") or {}
-        ship_group = eve_sde.ship_group(ship.get("id"))
-        record = {
-            "killId": k.get("killId"),
-            "timestamp": k.get("timestamp"),
-            "value": k.get("value") or 0,
-            "valueHuman": k.get("valueHuman"),
-            "system": sys_name,
-            "region": region,
-            "security": coord["security"] if coord else None,
-            "ship": {"id": ship.get("id"), "name": ship.get("name"), "group": ship_group},
-            "victim": _pilot(k.get("victim")),
-            "topDamage": _pilot(k.get("topDamage")),
-            "finalBlow": _pilot(k.get("finalBlow")),
-        }
-        kill_records.append(record)
+    records: list[dict] = []
+    fleets_meta = []
+    members: dict = {}
+    total_isk = 0
+    starts = []
 
-        if coord is None or not sys_name:
-            continue
-        hs = hotspots.get(sys_name)
-        if hs is None:
-            hs = hotspots[sys_name] = {
-                "system": sys_name,
-                "region": region,
-                "x": coord["x"],
-                "z": coord["z"],
-                "security": coord["security"],
-                "kills": 0,
-                "iskDestroyed": 0,
-                "killIds": [],
-            }
-        hs["kills"] += 1
-        hs["iskDestroyed"] += k.get("value") or 0
-        hs["killIds"].append(k.get("killId"))
+    for idx, data in enumerate(datas):
+        fleet = data.get("fleet") or {}
+        color = FLEET_COLORS[idx % len(FLEET_COLORS)]
+        tag = {"id": fleet.get("id"), "name": fleet.get("name"), "color": color}
+        fleet_kills = data.get("kills", []) or []
+        fleet_isk = sum(k.get("value") or 0 for k in fleet_kills)
+        total_isk += fleet_isk
+        if fleet.get("start"):
+            starts.append(fleet.get("start"))
+        for k in fleet_kills:
+            records.append(_kill_record(k, tag))
+        for m in data.get("members", []) or []:
+            if m.get("id") not in members:
+                members[m.get("id")] = m
+        fleets_meta.append({
+            "id": fleet.get("id"), "name": fleet.get("name"),
+            "providerName": fleet.get("providerName"), "providerSlug": fleet.get("providerSlug"),
+            "start": fleet.get("start"), "color": color,
+            "kills": len(fleet_kills), "iskHuman": _human_isk(fleet_isk),
+        })
 
+    agg = _aggregate(records)
+    return {
+        "combined": True,
+        "fleets": fleets_meta,
+        "fleet": {
+            "id": None,
+            "name": f"Combined · {len(fleets_meta)} fleets",
+            "start": min(starts) if starts else None,
+            "durationText": None,
+            "memberCount": len(members),
+            "providerName": "Multiple hosts",
+            "providerSlug": None,
+            "destroyedValueHuman": _human_isk(total_isk),
+            "fc": None,
+        },
+        "topDamage": None,
+        "topFinalBlow": None,
+        "regionStats": agg["regionStats"],
+        "totalKills": len(records),
+        "shipBreakdown": agg["shipBreakdown"],
+        "hotspots": agg["hotspots"],
+        "kills": records,
+        "members": list(members.values()),
+        "unmappedSystems": agg["unmappedSystems"],
+    }
+
+
+@api_router.get("/report/{report_id}")
+async def get_report(report_id: int):
+    """Fetch an NPSI fleet report live and map every kill onto SDE coordinates."""
+    data = await _fetch_npsi_report(report_id)
+    records = [_kill_record(k) for k in (data.get("kills", []) or [])]
+    agg = _aggregate(records)
     fleet = data.get("fleet") or {}
 
-    # Ship-class breakdown of what the fleet killed (grouped via the SDE).
-    groups: dict[str, dict] = {}
-    for rec in kill_records:
-        gname = rec["ship"]["group"] or "Unknown"
-        g = groups.get(gname)
-        if g is None:
-            g = groups[gname] = {"group": gname, "count": 0, "isk": 0}
-        g["count"] += 1
-        g["isk"] += rec["value"]
-    ship_breakdown = sorted(groups.values(), key=lambda d: (d["count"], d["isk"]), reverse=True)
-
     return {
+        "combined": False,
         "fleet": {
             "id": fleet.get("id"),
             "name": fleet.get("name"),
@@ -192,13 +292,13 @@ async def get_report(report_id: int):
         },
         "topDamage": _pilot(data.get("topDamage")),
         "topFinalBlow": _pilot(data.get("topFinalBlow")),
-        "regionStats": data.get("regionStats", []),
-        "totalKills": len(kill_records),
-        "shipBreakdown": ship_breakdown,
-        "hotspots": sorted(hotspots.values(), key=lambda h: h["iskDestroyed"], reverse=True),
-        "kills": kill_records,
+        "regionStats": agg["regionStats"],
+        "totalKills": len(records),
+        "shipBreakdown": agg["shipBreakdown"],
+        "hotspots": agg["hotspots"],
+        "kills": records,
         "members": data.get("members", []),
-        "unmappedSystems": sorted(unmapped),
+        "unmappedSystems": agg["unmappedSystems"],
     }
 
 

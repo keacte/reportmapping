@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 3 (Combine Fleets module) validated end-to-end. 26/26 backend pytest tests pass including new TestCombinedReport (shape, totals sum, member union, per-kill color/fleetId/fleetName tags, aggregates, single-id, invalid-id 404, empty 400) and combined:false regression on /api/report/622. Frontend Playwright verified: Recent panel opens, 6 group checkboxes present, Combine button disabled until >=2 ticks, ticking 3 fleets combines them (Combined \u00b7 3 fleets, 3 rows in combined-fleets block with color dots + kills + isk, 161 kills, 24.02b ISK, 111 fleet size, 32 systems, killmail rows show colored fleet tag bars). Recent panel closes on combine. Regression: single-report load via recent-report click restores non-combined view (combined-fleets block absent, fleet name updates); region rows zoom, kill-system click filters + clear-filter works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Timeline (bottom center)", "issues": ["Recharts still logs 'width(-1)/height(-1)' warning on first paint (pre-existing from iter 2, cosmetic only)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py combined_report: id de-dupe + cap-at-8 is good, but does not validate that recent==current input (no upper bound message). Consider returning 400 with a friendly message if id_list exceeds 8 (currently silently truncated).",
+    "FleetMap.jsx: after combine, if user then types the currently-set reportId (e.g. '622') in the load-by-id input and hits Map, useEffect on reportId does not fire because state value is unchanged (still '622'), so combined view lingers until a different id is entered. Consider tracking a version/nonce alongside reportId or calling loadReport directly on submit.",
+    "RecentRoams: no visible max-selection guard; UI lets user tick >8 but backend truncates. Consider disabling additional ticks past 8 or showing a hint."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None; live NPSI API. Combined tests dynamically derive ids from /api/reports/recent (first 2\u20133).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend tests in /app/backend/tests/backend_test.py; iter-3 classes: TestCombinedReport, TestReport622Combined. Frontend testids added this iter: group-check-<id>, combine-fleets-btn, group-clear-btn, combined-fleets, combined-fleet-<id>. KillRow renders a colored bar (from k.color) only when combined. Verified visible ids in recent feed during test run: 622, 619, 618, and 3 more."
+}
