@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
-import { heatColor, secColorAlpha } from "@/lib/eve";
+import { heatRGB, secRGB, brighten } from "@/lib/eve";
+
+const MAP_BRIGHTNESS = 1.1; // map colours rendered 10% brighter than the base palette
 
 // Interactive New Eden star map rendered on a single canvas.
 // - background: all known-space systems (faint dots) from the CCP SDE
@@ -51,7 +53,10 @@ export default function StarMap({ background, regions, hotspots, selected, highl
         if (px < -20 || px > w + 20 || py < -20 || py > h + 20) continue;
         const key = s.security == null ? "n" : s.security;
         let col = cache[key];
-        if (!col) col = cache[key] = secColorAlpha(s.security, 0.6);
+        if (!col) {
+          const [cr, cg, cb] = brighten(secRGB(s.security), MAP_BRIGHTNESS);
+          col = cache[key] = `rgba(${cr}, ${cg}, ${cb}, 0.6)`;
+        }
         ctx.fillStyle = col;
         ctx.fillRect(px, py, 1.4, 1.4);
       }
@@ -83,13 +88,14 @@ export default function StarMap({ background, regions, hotspots, selected, highl
         const [px, py] = apply(project(d.x, d.z));
         const intensity = d.iskDestroyed / maxIsk;
         const r = 5 + Math.sqrt(d.iskDestroyed / maxIsk) * 16;
-        const col = heatColor(intensity);
+        const [hr, hg, hb] = brighten(heatRGB(intensity), MAP_BRIGHTNESS);
+        const col = `rgb(${hr}, ${hg}, ${hb})`;
         const isSel = sel === d.system || hl === d.system;
 
         // glow
         const g = ctx.createRadialGradient(px, py, 0, px, py, r * 2.4);
-        g.addColorStop(0, col.replace("rgb", "rgba").replace(")", ",0.55)"));
-        g.addColorStop(1, col.replace("rgb", "rgba").replace(")", ",0)"));
+        g.addColorStop(0, `rgba(${hr}, ${hg}, ${hb}, 0.55)`);
+        g.addColorStop(1, `rgba(${hr}, ${hg}, ${hb}, 0)`);
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(px, py, r * 2.4, 0, Math.PI * 2);

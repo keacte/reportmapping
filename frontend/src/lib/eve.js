@@ -71,8 +71,7 @@ export function secColorAlpha(sec, alpha = 0.6) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Heat gradient blue -> purple -> fuchsia based on normalised intensity 0..1.
-export function heatColor(t) {
+export function heatRGB(t) {
   const clamp = Math.max(0, Math.min(1, t));
   const stops = [
     [0.0, [59, 130, 246]],
@@ -89,6 +88,16 @@ export function heatColor(t) {
   }
   const span = b[0] - a[0] || 1;
   const f = (clamp - a[0]) / span;
-  const c = a[1].map((v, i) => Math.round(v + (b[1][i] - v) * f));
-  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+  return a[1].map((v, i) => Math.round(v + (b[1][i] - v) * f));
+}
+
+// Heat gradient blue -> purple -> fuchsia based on normalised intensity 0..1.
+export function heatColor(t) {
+  const [r, g, b] = heatRGB(t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// Brighten an [r,g,b] triple by a factor (e.g. 1.1 = 10% brighter), clamped to 255.
+export function brighten(rgb, factor = 1.1) {
+  return rgb.map((v) => Math.min(255, Math.round(v * factor)));
 }
