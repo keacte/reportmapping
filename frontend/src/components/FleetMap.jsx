@@ -96,7 +96,7 @@ export default function FleetMap() {
           href="https://npsi.rocks/"
           target="_blank"
           rel="noopener noreferrer"
-          className="pointer-events-auto glass flex items-center gap-3 rounded-2xl px-4 py-2.5"
+          className="pointer-events-auto flex items-center gap-3"
           data-testid="brand-logo"
         >
           <img
