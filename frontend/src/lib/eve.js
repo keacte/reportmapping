@@ -29,12 +29,46 @@ export function formatTime(ts) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// Security-status colour (EVE convention).
+// EVE security-status colour ramp (highsec blue/green -> lowsec amber -> nullsec red).
+const SEC_STOPS = [
+  [1.0, [44, 116, 224]],
+  [0.9, [62, 147, 229]],
+  [0.8, [75, 198, 230]],
+  [0.7, [102, 224, 122]],
+  [0.6, [140, 230, 64]],
+  [0.5, [199, 224, 30]],
+  [0.4, [224, 161, 30]],
+  [0.3, [224, 123, 30]],
+  [0.2, [214, 90, 42]],
+  [0.1, [199, 54, 30]],
+  [0.0, [176, 24, 24]],
+  [-1.0, [110, 15, 15]],
+];
+
+export function secRGB(sec) {
+  if (sec == null) return [100, 116, 139];
+  const s = Math.max(-1, Math.min(1, sec));
+  let a = SEC_STOPS[0], b = SEC_STOPS[SEC_STOPS.length - 1];
+  for (let i = 0; i < SEC_STOPS.length - 1; i++) {
+    if (s <= SEC_STOPS[i][0] && s >= SEC_STOPS[i + 1][0]) {
+      a = SEC_STOPS[i];
+      b = SEC_STOPS[i + 1];
+      break;
+    }
+  }
+  const span = a[0] - b[0] || 1;
+  const f = (a[0] - s) / span;
+  return a[1].map((v, i) => Math.round(v + (b[1][i] - v) * f));
+}
+
 export function secColor(sec) {
-  if (sec == null) return "#64748b";
-  if (sec >= 0.5) return "#4ac0f0";
-  if (sec > 0.0) return "#e8c95a";
-  return "#ff4633";
+  const [r, g, b] = secRGB(sec);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+export function secColorAlpha(sec, alpha = 0.6) {
+  const [r, g, b] = secRGB(sec);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 // Heat gradient blue -> purple -> fuchsia based on normalised intensity 0..1.

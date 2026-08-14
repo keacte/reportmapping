@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
-import { heatColor, secColor } from "@/lib/eve";
+import { heatColor, secColorAlpha } from "@/lib/eve";
 
 // Interactive New Eden star map rendered on a single canvas.
 // - background: all known-space systems (faint dots) from the CCP SDE
@@ -42,14 +42,18 @@ export default function StarMap({ background, regions, hotspots, selected, focus
 
     const apply = ([px, py]) => [px * t.k + t.x, py * t.k + t.y];
 
-    // Background systems as faint stars
+    // Background systems coloured by security status (highsec->nullsec)
     if (bg) {
+      const cache = stateRef.current.secCache || (stateRef.current.secCache = {});
       for (let i = 0; i < bg.length; i++) {
         const s = bg[i];
         const [px, py] = apply(project(s.x, s.z));
         if (px < -20 || px > w + 20 || py < -20 || py > h + 20) continue;
-        ctx.fillStyle = "rgba(150,140,210,0.28)";
-        ctx.fillRect(px, py, 1.1, 1.1);
+        const key = s.security == null ? "n" : s.security;
+        let col = cache[key];
+        if (!col) col = cache[key] = secColorAlpha(s.security, 0.6);
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, 1.4, 1.4);
       }
     }
 
