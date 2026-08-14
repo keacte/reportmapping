@@ -303,7 +303,7 @@ export default function FleetMap() {
       {/* Legend */}
       <div className="pointer-events-none absolute bottom-4 left-4 z-20 glass rounded-2xl px-4 py-3">
         <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400">Content Heat · ISK</div>
-        <div className="h-1.5 w-40" style={{ background: "linear-gradient(90deg,#22c55e,#f59e0b,#ef4444)" }} />
+        <div className="h-1.5 w-40" style={{ background: "linear-gradient(90deg,#3b82f6,#a855f7,#d946ef)" }} />
         <div className="mt-1 flex justify-between font-mono text-[10px] text-slate-400"><span>low</span><span>high</span></div>
         <div className="mt-3 font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400">System Security</div>
         <div className="h-1.5 w-40" style={{ background: "linear-gradient(90deg,#2c74e0,#66e07a,#c7e01e,#e0a11e,#c7361e,#6e0f0f)" }} />
