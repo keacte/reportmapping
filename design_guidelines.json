@@ -1,0 +1,125 @@
+{
+  "theme": "EVE Online Sci-Fi / Retro-Futurism",
+  "description": "An immersive, dark 'in-space' aesthetic dashboard that visualizes EVE Online NPSI fleet roam reports. The experience should feel like a tactical command center on a spaceship, overlaying dense data panels on top of a vast, interactive 2D starfield map.",
+  "typography": {
+    "fonts": {
+      "headings": "'Rajdhani', sans-serif",
+      "body": "'JetBrains Mono', monospace",
+      "accents": "'Chakra Petch', sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-bold tracking-tighter uppercase text-white drop-shadow-[0_0_8px_rgba(0,240,255,0.5)]",
+      "h2": "text-2xl sm:text-3xl font-semibold tracking-tight uppercase text-gray-100",
+      "h3": "text-xl sm:text-2xl font-medium tracking-tight text-gray-200",
+      "h4": "text-lg font-medium text-gray-300",
+      "body": "text-sm text-gray-400 leading-relaxed font-mono",
+      "labels": "text-xs font-bold uppercase tracking-[0.2em] text-cyan-400"
+    },
+    "rules": [
+      "Use 'Rajdhani' for all major headings and UI module titles to give a sharp, sci-fi HUD feel.",
+      "Use 'JetBrains Mono' for tabular data, stats, ISK values, and killmail details for alignment and tactical feel.",
+      "Numbers and ISK values MUST use tabular lining features (e.g., `tabular-nums`) to align digits perfectly.",
+      "Never use Inter or generic sans-serif fonts for headings."
+    ]
+  },
+  "colors": {
+    "palette": {
+      "background": {
+        "void": "#05050A",
+        "deep_space": "#0B101E",
+        "panel_glass": "rgba(5, 5, 10, 0.65)"
+      },
+      "text": {
+        "primary": "#F8FAFC",
+        "secondary": "#94A3B8",
+        "muted": "#475569"
+      },
+      "accent": {
+        "neon_cyan": "#00F0FF",
+        "amarr_gold": "#FFB000",
+        "minmatar_rust": "#FF4633",
+        "gallente_green": "#00FF66",
+        "caldari_blue": "#0077FF"
+      },
+      "ui": {
+        "border": "rgba(255, 255, 255, 0.1)",
+        "border_glow": "rgba(0, 240, 255, 0.3)",
+        "hover": "rgba(0, 240, 255, 0.15)"
+      }
+    },
+    "rules": [
+      "No generic full-screen color gradients. Use deep void black and deep space blue.",
+      "Use Neon Cyan for primary interactions and active states.",
+      "Use Minmatar Rust/Red or Amarr Gold/Amber for high-threat elements, kills, or top damage.",
+      "Ensure text contrast meets APCA/WCAG AA standards, especially over glassmorphism.",
+      "Use 'Tinted Grey' rule: Greys should have a slight blue/indigo tint to fit the deep space theme."
+    ]
+  },
+  "visual_enhancers": {
+    "surfaces": {
+      "glass_panels": "Crystal Glass style. Backdrop blur is mandatory (`backdrop-blur-xl` or `backdrop-blur-2xl`). Background `bg-black/60` to `bg-[#0B101E]/70`. Must have a delicate inner stroke (`border border-white/10`) to separate from the star map.",
+      "hud_elements": "Add sharp, technical grid borders (`border-b border-r border-white/10`) for data tables and stat blocks to mimic a ship's tactical interface."
+    },
+    "effects": {
+      "glow": "Use subtle `drop-shadow` for glowing neon text and active UI elements (e.g., `drop-shadow-[0_0_8px_rgba(0,240,255,0.5)]`).",
+      "scanlines": "Optional: Add a very faint, repeating linear gradient overlay on empty UI module areas to give a retro-futuristic terminal feel.",
+      "hotspots": "For map hotspots (kills), use concentric animated rings or radial gradients simulating glowing stellar phenomena."
+    }
+  },
+  "layouts": {
+    "page_structure": "Full-screen immersive application layout (100vw, 100vh). No standard scrolling website structure.",
+    "layers": {
+      "layer_0_background": "Full-screen D3.js + HTML5 Canvas rendering the New Eden star map and neon route lines.",
+      "layer_1_ui": "Floating 'Bento' Grid of glass panels on top of the map. Pointer events none on the wrapper, auto on the panels.",
+      "left_sidebar": "w-80 or w-96 flex col layout for the Fleet Summary, Total Kills, and Region Breakdown.",
+      "right_sidebar": "w-80 or w-96 flex col layout containing the Scrollable Killmail Feed and Member Roster.",
+      "top_bar": "Minimalist header with app branding and report search/input field."
+    },
+    "spacing": "Dense internal padding for data panels (`p-4` or `p-6`) to utilize every pixel efficiently, with `gap-4` between bento widgets."
+  },
+  "components": {
+    "cards": "Override Shadcn Card. Remove solid backgrounds and shadows. Replace with `bg-black/60 backdrop-blur-xl border border-white/10`. Square or max `rounded-md` corners (sharp technical feel).",
+    "inputs": "Shadcn Input but styled as terminal prompts: `bg-black/40 border border-white/20 text-cyan-400 focus:ring-1 focus:ring-cyan-400 rounded-none`.",
+    "buttons": "Technical, flat buttons. `bg-cyan-500/10 text-cyan-400 border border-cyan-400/50 hover:bg-cyan-500/20 hover:shadow-[0_0_10px_rgba(0,240,255,0.4)] transition-all uppercase tracking-wider text-xs font-bold`.",
+    "scrollbars": "Custom styled scrollbars are MANDATORY. 4px width, `bg-white/5` track, `bg-white/20` thumb. No standard browser gutters.",
+    "portraits": "Pilot/Victim portraits should have sharp corners or cut-out hexagonal/octagonal masks, with a 1px solid border matching their faction or status."
+  },
+  "interactive_map_guidelines": {
+    "technology": "D3.js + HTML5 Canvas is MANDATORY for the star map to handle ~8000 nodes without DOM lag.",
+    "implementation_pattern": [
+      "Use D3 for scaling and coordinate mapping (projecting CCP SDE X/Z coordinates to screen space).",
+      "Use Canvas `ctx.arc()` to draw the 8000 background systems as faint, tiny dots (`rgba(255,255,255,0.3)`, radius 1-1.5).",
+      "Draw jump route lines as faint connecting strokes.",
+      "Overlay 'Content Hotspots' (systems with kills) as larger, glowing nodes on the Canvas.",
+      "Size the hotspot nodes by kill count or ISK destroyed.",
+      "Color the hotspots using a heat scale (e.g., Cyan -> Yellow -> Orange -> Red) based on intensity.",
+      "Implement zoom/pan using `d3.zoom()` attached to the Canvas.",
+      "Implement a spatial index (e.g., `d3.quadtree`) or hidden hit-canvas to detect hover/click events efficiently on the 8000 nodes."
+    ]
+  },
+  "image_urls": {
+    "background_nebula_texture": {
+      "url": "https://images.unsplash.com/photo-1707588884167-c482104c6e4b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHw0fHxkZWVwJTIwc3BhY2UlMjBuZWJ1bGF8ZW58MHx8fHwxNzg2NzIzNjg2fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Deep space nebula texture. Use as a highly transparent background image (`opacity-10` to `opacity-20`) beneath the Canvas star map or as a texture overlay to give depth to the void."
+    },
+    "hud_reference": {
+      "url": "https://images.unsplash.com/photo-1720962158937-7ea890052166?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNTl8MHwxfHNlYXJjaHwzfHxzY2ktZmklMjBzcGFjZXNoaXAlMjBkYXNoYm9hcmQlMjBVSXxlbnwwfHx8fDE3ODY3MjM2ODZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Sci-fi spaceship dashboard UI reference for grid styling and neon accent inspiration."
+    }
+  },
+  "general_ui_ux_guidelines": {
+    "data_testid": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., `data-testid=\"search-report-input\"`, `data-testid=\"killmail-item-12345\"`).",
+    "links": "Clicking a system on the map or a pilot portrait in the feed MUST open an external link to zKillboard or npsi.rocks character pages (`target=\"_blank\" rel=\"noopener noreferrer\"`).",
+    "interactions": "Hovering over a hotspot on the map should highlight the node, display a tooltip with system stats (Kills, ISK), and dynamically filter or highlight the side panel feed.",
+    "transitions": "Use quick, snappy transitions (`duration-150 ease-out`) for UI elements. Avoid slow, floaty animations in a tactical dashboard.",
+    "transparency_rule": "NEVER use a completely transparent background on interactive elements (dropdowns, inputs) placed over the star map. Always use `bg-black/80` or similar to ensure text readability."
+  },
+  "instructions_to_main_agent": [
+    "Install and use `d3` and `@types/d3` for the star map rendering math and zoom behaviors.",
+    "Do not use SVG circles for the 8000 systems; it will lag. Use a single `<canvas>` element.",
+    "Fetch and parse the EVE SDE map data and npsi.rocks fleet data, merging the kill locations with the SDE coordinates.",
+    "Layout the app as a full-viewport absolute positioned UI, with floating panels positioned over the canvas map.",
+    "Implement Shadcn UI for dropdowns and inputs, but severely override the styling to match the Glass/Neon theme.",
+    "Ensure `Rajdhani` and `JetBrains Mono` are imported via Google Fonts or standard imports."
+  ]
+}
