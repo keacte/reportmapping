@@ -26,6 +26,10 @@ export default function FleetMap() {
   const [recent, setRecent] = useState([]);
   const [recentStats, setRecentStats] = useState(null);
   const [recentOpen, setRecentOpen] = useState(false);
+  const [hosts, setHosts] = useState([]);
+  const [hostSlug, setHostSlug] = useState(null);
+  const [hostReports, setHostReports] = useState(null);
+  const [hostLoading, setHostLoading] = useState(false);
   const [showTimeline, setShowTimeline] = useState(true);
   const [focusRegion, setFocusRegion] = useState(null);
   const [groupIds, setGroupIds] = useState([]);
@@ -47,6 +51,18 @@ export default function FleetMap() {
       setRecent(r.data.reports || []);
       setRecentStats(r.data.stats || null);
     }).catch(() => {});
+    axios.get(`${API}/hosts`).then((r) => setHosts(r.data.hosts || [])).catch(() => {});
+  }, []);
+
+  const selectHost = useCallback((slug) => {
+    setGroupIds([]);
+    setHostSlug(slug);
+    if (!slug) { setHostReports(null); return; }
+    setHostLoading(true);
+    axios.get(`${API}/hosts/${slug}`)
+      .then((r) => setHostReports(r.data.reports || []))
+      .catch(() => setHostReports([]))
+      .finally(() => setHostLoading(false));
   }, []);
 
   const loadUrl = useCallback((url) => {
@@ -243,7 +259,7 @@ export default function FleetMap() {
       <RecentRoams
         open={recentOpen}
         onClose={() => setRecentOpen(false)}
-        reports={recent}
+        reports={hostSlug ? (hostReports || []) : recent}
         stats={recentStats}
         currentId={reportId}
         onPick={(id) => { setInputId(String(id)); setReportId(String(id)); loadReport(id); setRecentOpen(false); }}
@@ -251,6 +267,10 @@ export default function FleetMap() {
         onToggleGroup={toggleGroup}
         onCombine={loadCombined}
         onClearGroup={() => setGroupIds([])}
+        hosts={hosts}
+        hostSlug={hostSlug}
+        onSelectHost={selectHost}
+        hostLoading={hostLoading}
       />
 
       {/* Left summary panel */}

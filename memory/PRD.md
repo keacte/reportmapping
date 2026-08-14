@@ -35,8 +35,10 @@ Visualize an EVE Online NPSI fleet roam report as an interactive New Eden star m
 - **Region labels** float over each region (SDE centroids); **click a region row to zoom** the map to that region's bounds
 - **Security-status coloured** systems (highsec blue/green → lowsec amber → nullsec red) with a legend
 - **2D schematic map** layout (SDE position2D) + NPSI purple/blue theme (Orbitron, glass, logo branding)
-- **Combine Fleets module**: group-select multiple recent reports and merge them into one aggregated report/map (merged hotspots/regions/ships/timeline, per-fleet colour-coded kills, union of members)
-- Verified: backend 100%, frontend 100% (testing agent iterations 1–3)
+- **Combine Fleets module**: group-select multiple recent reports and merge them into one aggregated report/map (merged hotspots/regions/ships, per-fleet colour-coded kills, union of members). Replay + kill-activity chart are single-report only.
+- **Replay Roam**: animate a single report's kills onto the map over 30s with a synced playhead sweeping the kill-activity chart.
+- **NPSI Host search**: search/filter by host (from npsi.rocks/hosts) in the Recent Roams panel to browse & load/combine that host's fleet reports.
+- Verified: backend 100%, frontend 100% (testing agent iterations 1–4)
 
 ## Backlog (P1/P2)
 - P1: Highlight/animate the roam route sequentially (playback over time)

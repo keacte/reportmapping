@@ -1,0 +1,28 @@
+{
+  "summary": "Iteration 4 (NPSI host search/filter) fully validated. Backend: 32/32 pytest tests pass, including new TestHosts (shape, sorted, expected slugs 'fun-inc' & 'bombers-bar', absolute logos, /api/hosts/fun-inc returns provider F.U.N. Inc. with 622 in reports, /api/hosts/does-not-exist-xyz -> 404). All previous iterations (universe, /api/report/622, /api/reports/recent, /api/report/combined) still green. Frontend: Recent panel opens, host-search-input present; typing 'bomber' opens host-menu with host-option-bombers-bar; clicking loads Bombers Bar's 6 reports and panel header shows 'Bombers Bar'; host-clear-btn resets to global 'Recent Roams'. Host-filtered rows retain recent-report-<id> and group-check-<id> selectors — clicking loads report (Wednesday Whaling); ticking 2 host reports + Combine builds combined-fleets block with 'Combined · 2 fleets'. Regression: replay-roam-btn hidden for combined, timeline-panel hidden for combined, both reappear after reloading single report 622.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Timeline (bottom center)", "issues": ["Recharts 'width(-1)/height(-1)' warning persists on first paint (pre-existing, cosmetic)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py /api/hosts/{slug}: relies on NPSI 404 propagation via _fetch_json; verified working (404 for unknown slug). No input validation on slug format, but NPSI upstream handles it.",
+    "FleetMap selectHost: when switching hosts, existing groupIds are cleared (good) but if user had a combined report loaded, that report state persists on screen until they pick a new one. Consider clearing report or hint UI. Minor UX only.",
+    "RecentRoams host dropdown menu (host-menu) has no explicit outside-click close handler; clicking outside doesn't dismiss it (only picking a host or clearing does). Minor UX polish.",
+    "Iteration-3 comments still apply: no visible max-ticks-8 guard; combined view can linger if user re-submits the same reportId (reportId state unchanged so effect doesn't refire)."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None; live NPSI API. Host tests use stable slug 'fun-inc' + report 622. Frontend combine test dynamically picked first two bombers-bar reports (ids observed at runtime: 610, 577).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend tests in /app/backend/tests/backend_test.py; iter-4 class: TestHosts. Frontend testids added: host-search-input, host-menu, host-option-<slug>, host-clear-btn. bombers-bar had 6 reports at test time; F.U.N. Inc. slug is 'fun-inc'. Recent panel closes after picking a report (by design), so tests must reopen it before selecting host again."
+}

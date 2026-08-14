@@ -227,3 +227,56 @@ class TestCombinedReport:
 class TestReport622Combined:
     def test_combined_flag_false(self, report_622):
         assert report_622.get("combined") is False
+
+
+# --- Iteration 4: /api/hosts and /api/hosts/{slug} ---
+class TestHosts:
+    @pytest.fixture(scope="class")
+    def hosts_data(self):
+        r = requests.get(f"{API}/hosts", timeout=60)
+        assert r.status_code == 200, f"hosts failed: {r.status_code} {r.text[:300]}"
+        return r.json()
+
+    def test_hosts_shape(self, hosts_data):
+        assert "count" in hosts_data and "hosts" in hosts_data
+        assert hosts_data["count"] == len(hosts_data["hosts"])
+        assert hosts_data["count"] >= 15, f"expected ~23 hosts, got {hosts_data['count']}"
+        entry = hosts_data["hosts"][0]
+        for key in ("name", "slug", "logo", "website"):
+            assert key in entry, f"missing {key} in host entry"
+
+    def test_hosts_sorted_by_name(self, hosts_data):
+        names = [(h["name"] or "").lower() for h in hosts_data["hosts"]]
+        assert names == sorted(names), "hosts should be sorted by name asc"
+
+    def test_hosts_expected_slugs_present(self, hosts_data):
+        slugs = {h["slug"] for h in hosts_data["hosts"]}
+        assert "fun-inc" in slugs, f"expected 'fun-inc' in slugs: {slugs}"
+        assert "bombers-bar" in slugs, f"expected 'bombers-bar' in slugs: {slugs}"
+
+    def test_hosts_logos_absolute(self, hosts_data):
+        for h in hosts_data["hosts"]:
+            if h["logo"]:
+                assert h["logo"].startswith("http"), h["logo"]
+
+    def test_host_fun_inc_reports(self):
+        r = requests.get(f"{API}/hosts/fun-inc", timeout=60)
+        assert r.status_code == 200, f"fun-inc failed: {r.status_code} {r.text[:300]}"
+        data = r.json()
+        assert "host" in data and "reports" in data
+        host = data["host"]
+        assert host["slug"] == "fun-inc"
+        assert host["name"] == "F.U.N. Inc.", f"unexpected host name: {host['name']}"
+        # Reports shape
+        reports = data["reports"]
+        assert isinstance(reports, list) and len(reports) > 0
+        rep = reports[0]
+        for key in ("id", "name", "date", "fc", "host", "hostLogo", "iskHuman", "isk"):
+            assert key in rep
+        # 622 should be present per spec
+        ids = {r["id"] for r in reports}
+        assert 622 in ids, f"expected 622 in fun-inc reports, got sample: {sorted(list(ids))[:10]}"
+
+    def test_host_not_found(self):
+        r = requests.get(f"{API}/hosts/does-not-exist-xyz", timeout=60)
+        assert r.status_code == 404, f"expected 404, got {r.status_code}: {r.text[:200]}"

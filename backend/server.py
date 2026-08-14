@@ -14,10 +14,55 @@ load_dotenv(ROOT_DIR / '.env')
 
 NPSI_API = "https://i.npsi.rocks/reports/api/fleet"
 NPSI_HOME = "https://i.npsi.rocks/events/api/home"
+NPSI_HOSTS = "https://i.npsi.rocks/events/api/hosts"
 NPSI_MEDIA = "https://media.npsi.rocks"
 
 app = FastAPI(title="New Eden Fleet Cartographer")
 api_router = APIRouter(prefix="/api")
+
+
+def _abs_logo(logo: str | None) -> str | None:
+    return (NPSI_MEDIA + logo) if logo and logo.startswith("/") else logo
+
+
+def _map_report_entries(raw_list) -> list[dict]:
+    """Map NPSI 'recent_fleet_reports' entries to our compact shape."""
+    out = []
+    for r in raw_list or []:
+        url = r.get("reportUrl") or ""
+        rid = None
+        for part in url.strip("/").split("/"):
+            if part.isdigit():
+                rid = int(part)
+        if rid is None:
+            continue
+        out.append({
+            "id": rid,
+            "name": r.get("eventName"),
+            "date": r.get("eventStart"),
+            "fc": r.get("fc"),
+            "host": r.get("hostName"),
+            "hostLogo": _abs_logo(r.get("hostLogo")),
+            "iskHuman": r.get("destroyedValueHuman"),
+            "isk": r.get("destroyedValue") or 0,
+        })
+    return out
+
+
+async def _fetch_json(url: str):
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            resp = await client.get(url, headers={"Accept": "application/json"})
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to reach NPSI: {exc}")
+    if resp.status_code == 404:
+        raise HTTPException(status_code=404, detail="Not found")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"NPSI returned {resp.status_code}")
+    try:
+        return resp.json()
+    except ValueError:
+        raise HTTPException(status_code=502, detail="NPSI response was not JSON")
 
 
 @api_router.get("/")
@@ -42,44 +87,45 @@ async def universe_regions():
 @api_router.get("/reports/recent")
 async def recent_reports():
     """Recent NPSI fleet reports for the roam browser."""
-    try:
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
-            resp = await client.get(NPSI_HOME, headers={"Accept": "application/json"})
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to reach NPSI: {exc}")
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"NPSI returned {resp.status_code}")
-    try:
-        data = resp.json()
-    except ValueError:
-        raise HTTPException(status_code=502, detail="NPSI response was not JSON")
-
-    out = []
-    for r in data.get("recent_fleet_reports", []) or []:
-        url = r.get("reportUrl") or ""
-        rid = None
-        for part in url.strip("/").split("/"):
-            if part.isdigit():
-                rid = int(part)
-        if rid is None:
-            continue
-        logo = r.get("hostLogo")
-        out.append({
-            "id": rid,
-            "name": r.get("eventName"),
-            "date": r.get("eventStart"),
-            "fc": r.get("fc"),
-            "host": r.get("hostName"),
-            "hostLogo": (NPSI_MEDIA + logo) if logo and logo.startswith("/") else logo,
-            "iskHuman": r.get("destroyedValueHuman"),
-            "isk": r.get("destroyedValue") or 0,
-        })
-    return {"reports": out, "stats": {
+    data = await _fetch_json(NPSI_HOME)
+    return {"reports": _map_report_entries(data.get("recent_fleet_reports")), "stats": {
         "kills30d": data.get("kills_30d"),
         "isk30d": data.get("isk_30d"),
         "hostCount": data.get("hostCount"),
         "fleets7d": data.get("fleets_7d"),
     }}
+
+
+@api_router.get("/hosts")
+async def list_hosts():
+    """All NPSI hosts (from https://npsi.rocks/hosts)."""
+    data = await _fetch_json(NPSI_HOSTS)
+    hosts = []
+    for h in data or []:
+        hosts.append({
+            "name": h.get("name"),
+            "slug": h.get("slug"),
+            "logo": _abs_logo(h.get("logo")),
+            "website": h.get("website"),
+        })
+    hosts.sort(key=lambda h: (h["name"] or "").lower())
+    return {"count": len(hosts), "hosts": hosts}
+
+
+@api_router.get("/hosts/{slug}")
+async def host_reports(slug: str):
+    """A single host's recent fleet reports (for host-filtered roam browsing)."""
+    data = await _fetch_json(f"{NPSI_HOSTS}/{slug}")
+    provider = data.get("provider") or {}
+    return {
+        "host": {
+            "name": provider.get("name"),
+            "slug": provider.get("slug"),
+            "logo": _abs_logo(provider.get("logo")),
+            "website": provider.get("website"),
+        },
+        "reports": _map_report_entries(data.get("recent_fleet_reports")),
+    }
 
 
 def _pilot(node: dict | None) -> dict | None:
