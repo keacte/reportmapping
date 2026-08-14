@@ -96,7 +96,7 @@ export default function FleetMap() {
   }, []);
 
   const startReplay = useCallback(() => {
-    if (!segments.length) return;
+    if (!segments.length || report?.combined) return;
     const DURATION = 30000; // 30s per report/roam
     replayRef.current.active = true;
 
@@ -149,7 +149,7 @@ export default function FleetMap() {
     };
 
     playSegment(0);
-  }, [segments, stopReplay]);
+  }, [segments, report, stopReplay]);
 
   // Stop any replay when the report changes or on unmount.
   useEffect(() => () => stopReplay(), [stopReplay]);
@@ -436,13 +436,15 @@ export default function FleetMap() {
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5">
             <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400">Kill Activity · 5-min · cumulative ISK</div>
             <div className="flex items-center gap-3">
-              <button
-                data-testid="replay-roam-btn"
-                onClick={() => (replay ? stopReplay() : startReplay())}
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all ${replay ? "border-red-400/60 bg-red-500/15 text-red-200" : "border-purple-400/50 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 hover:shadow-[0_0_12px_rgba(168,85,247,0.35)]"}`}
-              >
-                {replay ? <><Square className="h-3 w-3" /> Stop</> : <><Play className="h-3 w-3" /> Replay Roam</>}
-              </button>
+              {!report.combined && (
+                <button
+                  data-testid="replay-roam-btn"
+                  onClick={() => (replay ? stopReplay() : startReplay())}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all ${replay ? "border-red-400/60 bg-red-500/15 text-red-200" : "border-purple-400/50 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 hover:shadow-[0_0_12px_rgba(168,85,247,0.35)]"}`}
+                >
+                  {replay ? <><Square className="h-3 w-3" /> Stop</> : <><Play className="h-3 w-3" /> Replay Roam</>}
+                </button>
+              )}
               <button
                 data-testid="timeline-toggle-btn"
                 onClick={() => setShowTimeline((v) => !v)}
