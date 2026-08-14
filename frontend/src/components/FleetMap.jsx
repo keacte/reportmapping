@@ -424,8 +424,8 @@ export default function FleetMap() {
         </div>
       )}
 
-      {/* Kill timeline (bottom center) */}
-      {report && report.kills?.length > 0 && (
+      {/* Kill timeline (bottom center) — single report only */}
+      {report && !report.combined && report.kills?.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
