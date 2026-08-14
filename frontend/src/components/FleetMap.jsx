@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Rocket, Crosshair, Users, Radar, Zap, Skull, ExternalLink, Search, MapPin, X, History } from "lucide-react";
+import { Rocket, Crosshair, Users, Zap, Skull, ExternalLink, Search, MapPin, X, History } from "lucide-react";
 import StarMap from "@/components/StarMap";
 import Timeline from "@/components/Timeline";
 import RecentRoams from "@/components/RecentRoams";
@@ -92,15 +92,24 @@ export default function FleetMap() {
 
       {/* Top command bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 p-4">
-        <div className="pointer-events-auto glass rounded-2xl px-4 py-2.5">
-          <div className="flex items-center gap-2.5">
-            <Radar className="h-5 w-5 text-purple-400" strokeWidth={1.5} />
-            <div className="leading-none">
-              <div className="font-display text-lg font-bold uppercase tracking-wider neon-text">New Eden Cartographer</div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400/70">NPSI Fleet Content Hotspots · CCP SDE</div>
-            </div>
-          </div>
-        </div>
+        <a
+          href="https://npsi.rocks/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="pointer-events-auto glass flex items-center gap-3 rounded-2xl px-4 py-2.5"
+          data-testid="brand-logo"
+        >
+          <img
+            src="https://customer-assets-4nw71qhi.emergentagent.net/job_fleet-analytics-eve/artifacts/st0pr55r_friend.png"
+            alt="NPSI"
+            className="h-9 w-auto"
+          />
+          <img
+            src="https://customer-assets-4nw71qhi.emergentagent.net/job_fleet-analytics-eve/artifacts/ioffdsma_NPSI.ROCKS%20OXANIUM.webp"
+            alt="NPSI.ROCKS"
+            className="h-6 w-auto"
+          />
+        </a>
 
         <form onSubmit={submit} className="pointer-events-auto glass flex items-center gap-2 rounded-2xl px-2 py-1.5" data-testid="report-search-form">
           <button
