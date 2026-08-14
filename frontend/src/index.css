@@ -1,15 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Chakra+Petch:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --void: #05050a;
-  --deep-space: #0b101e;
-  --neon: #00f0ff;
-  --gold: #ffb000;
-  --rust: #ff4633;
-  --green: #00ff66;
+  --void: #080a0f;
+  --panel: rgba(15, 18, 26, 0.65);
+  --purple: #a855f7;
+  --blue: #3b82f6;
+  --fuchsia: #d946ef;
 }
 
 html, body, #root {
@@ -20,82 +19,69 @@ body {
   margin: 0;
   background-color: var(--void);
   color: #f8fafc;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
 }
 
-.font-display { font-family: 'Rajdhani', sans-serif; }
-.font-accent { font-family: 'Chakra Petch', sans-serif; }
-.font-mono { font-family: 'JetBrains Mono', monospace; }
+.font-display { font-family: 'Orbitron', sans-serif; }
+.font-accent { font-family: 'Orbitron', sans-serif; }
+.font-mono { font-family: 'Inter', system-ui, sans-serif; }
 
 @layer base {
   :root {
-    --background: 230 45% 6%;
+    --background: 222 33% 5%;
     --foreground: 210 40% 98%;
-    --card: 225 40% 8%;
+    --card: 222 26% 8%;
     --card-foreground: 210 40% 98%;
-    --popover: 225 40% 8%;
+    --popover: 222 26% 8%;
     --popover-foreground: 210 40% 98%;
-    --primary: 186 100% 50%;
-    --primary-foreground: 230 45% 6%;
-    --secondary: 225 20% 16%;
+    --primary: 271 91% 65%;
+    --primary-foreground: 222 33% 5%;
+    --secondary: 222 20% 16%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 225 20% 14%;
+    --muted: 222 20% 14%;
     --muted-foreground: 215 20% 65%;
-    --accent: 225 20% 16%;
+    --accent: 271 91% 65%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 8 100% 60%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 210 40% 98% / 0.1;
+    --border: 210 40% 98% / 0.06;
     --input: 210 40% 30%;
-    --ring: 186 100% 50%;
-    --radius: 0.25rem;
+    --ring: 271 91% 65%;
+    --radius: 1rem;
   }
 }
 
 @layer base {
-  * { border-color: rgba(255, 255, 255, 0.1); }
+  * { border-color: rgba(255, 255, 255, 0.06); }
   body { @apply text-foreground; }
 }
 
-/* Custom neon scrollbars */
+/* Subtle grid backdrop (matches NPSI grid-bg) */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(168, 85, 247, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
 .thin-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
 .thin-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
-.thin-scroll::-webkit-scrollbar-thumb { background: rgba(0,240,255,0.25); border-radius: 0; }
-.thin-scroll::-webkit-scrollbar-thumb:hover { background: rgba(0,240,255,0.45); }
-.thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(0,240,255,0.25) transparent; }
+.thin-scroll::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.35); border-radius: 9999px; }
+.thin-scroll::-webkit-scrollbar-thumb:hover { background: rgba(168,85,247,0.55); }
+.thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(168,85,247,0.35) transparent; }
 
 .glass {
-  background: rgba(6, 9, 18, 0.72);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(15, 18, 26, 0.65);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
-.neon-text { text-shadow: 0 0 10px rgba(0, 240, 255, 0.55); }
-
-.scanlines::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(0, 240, 255, 0.03) 0px,
-    rgba(0, 240, 255, 0.03) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  opacity: 0.4;
-}
-
-@keyframes pulse-ring {
-  0% { transform: scale(0.85); opacity: 0.9; }
-  100% { transform: scale(1.6); opacity: 0; }
-}
-.animate-pulse-ring { animation: pulse-ring 1.8s ease-out infinite; }
+.neon-text { text-shadow: 0 0 12px rgba(168, 85, 247, 0.55); }
 
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(8px); }

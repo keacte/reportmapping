@@ -5,15 +5,14 @@ import { heatColor, secColor } from "@/lib/eve";
 // Interactive New Eden star map rendered on a single canvas.
 // - background: all known-space systems (faint dots) from the CCP SDE
 // - hotspots: systems where the fleet got kills (glowing, sized by ISK)
-// - route: ordered coords tracing the roam path
-export default function StarMap({ background, hotspots, route, selected, onSelect, onHover }) {
+export default function StarMap({ background, hotspots, selected, onSelect, onHover }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const stateRef = useRef({ proj: null, quad: null, transform: d3.zoomIdentity, size: { w: 0, h: 0 } });
   const zoomRef = useRef(null);
-  const dataRef = useRef({ background, hotspots, route, selected });
+  const dataRef = useRef({ background, hotspots, selected });
 
-  dataRef.current = { background, hotspots, route, selected };
+  dataRef.current = { background, hotspots, selected };
 
   const project = useCallback((x, z) => {
     const p = stateRef.current.proj;
@@ -28,15 +27,15 @@ export default function StarMap({ background, hotspots, route, selected, onSelec
     const { w, h } = stateRef.current.size;
     const dpr = window.devicePixelRatio || 1;
     const t = stateRef.current.transform;
-    const { background: bg, hotspots: hs, route: rt, selected: sel } = dataRef.current;
+    const { background: bg, hotspots: hs, selected: sel } = dataRef.current;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    // Deep-space vignette
+    // Deep-space vignette (purple/blue tint)
     const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
-    grad.addColorStop(0, "rgba(14,22,44,0.55)");
-    grad.addColorStop(1, "rgba(3,4,10,0)");
+    grad.addColorStop(0, "rgba(30,20,55,0.5)");
+    grad.addColorStop(1, "rgba(8,10,15,0)");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
@@ -48,26 +47,9 @@ export default function StarMap({ background, hotspots, route, selected, onSelec
         const s = bg[i];
         const [px, py] = apply(project(s.x, s.z));
         if (px < -20 || px > w + 20 || py < -20 || py > h + 20) continue;
-        ctx.fillStyle = "rgba(120,150,205,0.28)";
+        ctx.fillStyle = "rgba(150,140,210,0.28)";
         ctx.fillRect(px, py, 1.1, 1.1);
       }
-    }
-
-    // Roam route lines
-    if (rt && rt.length > 1) {
-      ctx.save();
-      ctx.strokeStyle = "rgba(0,240,255,0.55)";
-      ctx.lineWidth = 1.3;
-      ctx.shadowColor = "rgba(0,240,255,0.8)";
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      rt.forEach((pt, i) => {
-        const [px, py] = apply(project(pt.x, pt.z));
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      });
-      ctx.stroke();
-      ctx.restore();
     }
 
     // Hotspots
@@ -99,7 +81,7 @@ export default function StarMap({ background, hotspots, route, selected, onSelec
         ctx.stroke();
 
         // label
-        ctx.font = "600 12px Rajdhani, sans-serif";
+        ctx.font = "600 12px Orbitron, sans-serif";
         ctx.fillStyle = isSel ? "#ffffff" : "rgba(226,240,255,0.85)";
         ctx.shadowColor = "rgba(0,0,0,0.9)";
         ctx.shadowBlur = 4;
@@ -243,7 +225,7 @@ export default function StarMap({ background, hotspots, route, selected, onSelec
       stateRef.current.quad = d3.quadtree().x((p) => p.px).y((p) => p.py).addAll(pts);
       requestDraw();
     }
-  }, [hotspots, route, selected, project, requestDraw]);
+  }, [hotspots, selected, project, requestDraw]);
 
   // Re-frame the cluster whenever a new report's hotspots load
   useEffect(() => {

@@ -46,25 +46,25 @@ export default function Timeline({ kills }) {
         <ComposedChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
           <defs>
             <linearGradient id="killBar" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#00f0ff" stopOpacity={0.95} />
-              <stop offset="100%" stopColor="#0077ff" stopOpacity={0.35} />
+              <stop offset="0%" stopColor="#a855f7" stopOpacity={0.95} />
+              <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.35} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="2 4" stroke="rgba(255,255,255,0.06)" vertical={false} />
-          <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 9, fontFamily: "JetBrains Mono" }}
+          <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 9, fontFamily: "Inter" }}
             interval="preserveStartEnd" tickLine={false} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} />
-          <YAxis yAxisId="k" tick={{ fill: "#64748b", fontSize: 9, fontFamily: "JetBrains Mono" }}
+          <YAxis yAxisId="k" tick={{ fill: "#64748b", fontSize: 9, fontFamily: "Inter" }}
             tickLine={false} axisLine={false} width={22} allowDecimals={false} />
-          <YAxis yAxisId="i" orientation="right" tick={{ fill: "#ffb000", fontSize: 9, fontFamily: "JetBrains Mono" }}
+          <YAxis yAxisId="i" orientation="right" tick={{ fill: "#c084fc", fontSize: 9, fontFamily: "Inter" }}
             tickLine={false} axisLine={false} width={34} tickFormatter={(v) => formatIsk(v)} />
           <Tooltip
-            contentStyle={{ background: "rgba(6,9,18,0.95)", border: "1px solid rgba(0,240,255,0.3)", borderRadius: 2, fontFamily: "JetBrains Mono", fontSize: 11 }}
-            labelStyle={{ color: "#00f0ff" }}
+            contentStyle={{ background: "rgba(15,18,26,0.95)", border: "1px solid rgba(168,85,247,0.35)", borderRadius: 10, fontFamily: "Inter", fontSize: 11 }}
+            labelStyle={{ color: "#c084fc" }}
             formatter={(val, name) => name === "cumIsk" ? [formatIsk(val) + " ISK", "Cumulative"] : [val, "Kills"]}
           />
-          <Bar yAxisId="k" dataKey="kills" fill="url(#killBar)" radius={[2, 2, 0, 0]} maxBarSize={26} />
-          <Line yAxisId="i" type="monotone" dataKey="cumIsk" stroke="#ffb000" strokeWidth={2} dot={false}
-            style={{ filter: "drop-shadow(0 0 4px rgba(255,176,0,0.6))" }} />
+          <Bar yAxisId="k" dataKey="kills" fill="url(#killBar)" radius={[3, 3, 0, 0]} maxBarSize={26} />
+          <Line yAxisId="i" type="monotone" dataKey="cumIsk" stroke="#a855f7" strokeWidth={2} dot={false}
+            style={{ filter: "drop-shadow(0 0 5px rgba(168,85,247,0.6))" }} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

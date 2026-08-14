@@ -37,13 +37,13 @@ export function secColor(sec) {
   return "#ff4633";
 }
 
-// Heat gradient cyan -> gold -> rust based on normalised intensity 0..1.
+// Heat gradient blue -> purple -> fuchsia based on normalised intensity 0..1.
 export function heatColor(t) {
   const clamp = Math.max(0, Math.min(1, t));
   const stops = [
-    [0.0, [0, 240, 255]],
-    [0.5, [255, 176, 0]],
-    [1.0, [255, 70, 51]],
+    [0.0, [59, 130, 246]],
+    [0.5, [168, 85, 247]],
+    [1.0, [217, 70, 239]],
   ];
   let a = stops[0], b = stops[stops.length - 1];
   for (let i = 0; i < stops.length - 1; i++) {
