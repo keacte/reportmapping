@@ -4,15 +4,16 @@ import { heatColor, secColor } from "@/lib/eve";
 
 // Interactive New Eden star map rendered on a single canvas.
 // - background: all known-space systems (faint dots) from the CCP SDE
+// - regions: region label anchors (centroids)
 // - hotspots: systems where the fleet got kills (glowing, sized by ISK)
-export default function StarMap({ background, hotspots, selected, onSelect, onHover }) {
+export default function StarMap({ background, regions, hotspots, selected, onSelect, onHover }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const stateRef = useRef({ proj: null, quad: null, transform: d3.zoomIdentity, size: { w: 0, h: 0 } });
   const zoomRef = useRef(null);
-  const dataRef = useRef({ background, hotspots, selected });
+  const dataRef = useRef({ background, regions, hotspots, selected });
 
-  dataRef.current = { background, hotspots, selected };
+  dataRef.current = { background, regions, hotspots, selected };
 
   const project = useCallback((x, z) => {
     const p = stateRef.current.proj;
@@ -27,7 +28,7 @@ export default function StarMap({ background, hotspots, selected, onSelect, onHo
     const { w, h } = stateRef.current.size;
     const dpr = window.devicePixelRatio || 1;
     const t = stateRef.current.transform;
-    const { background: bg, hotspots: hs, selected: sel } = dataRef.current;
+    const { background: bg, regions: rg, hotspots: hs, selected: sel } = dataRef.current;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
@@ -50,6 +51,25 @@ export default function StarMap({ background, hotspots, selected, onSelect, onHo
         ctx.fillStyle = "rgba(150,140,210,0.28)";
         ctx.fillRect(px, py, 1.1, 1.1);
       }
+    }
+
+    // Floating region names at each region centroid
+    if (rg) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "700 11px Orbitron, sans-serif";
+      for (const r of rg) {
+        const [px, py] = apply(project(r.x, r.z));
+        if (px < -60 || px > w + 60 || py < -30 || py > h + 30) continue;
+        const label = r.name.toUpperCase();
+        ctx.shadowColor = "rgba(8,10,15,0.95)";
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = "rgba(196,181,253,0.45)";
+        ctx.fillText(label, px, py);
+      }
+      ctx.restore();
+      ctx.shadowBlur = 0;
     }
 
     // Hotspots
@@ -225,7 +245,7 @@ export default function StarMap({ background, hotspots, selected, onSelect, onHo
       stateRef.current.quad = d3.quadtree().x((p) => p.px).y((p) => p.py).addAll(pts);
       requestDraw();
     }
-  }, [hotspots, selected, project, requestDraw]);
+  }, [hotspots, regions, selected, project, requestDraw]);
 
   // Re-frame the cluster whenever a new report's hotspots load
   useEffect(() => {

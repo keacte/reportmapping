@@ -14,6 +14,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function FleetMap() {
   const [background, setBackground] = useState(null);
+  const [regions, setRegions] = useState(null);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,6 +30,7 @@ export default function FleetMap() {
 
   useEffect(() => {
     axios.get(`${API}/universe/systems`).then((r) => setBackground(r.data.systems)).catch(() => {});
+    axios.get(`${API}/universe/regions`).then((r) => setRegions(r.data.regions)).catch(() => {});
     axios.get(`${API}/reports/recent`).then((r) => {
       setRecent(r.data.reports || []);
       setRecentStats(r.data.stats || null);
@@ -73,6 +75,7 @@ export default function FleetMap() {
       {/* Star map backdrop */}
       <StarMap
         background={background}
+        regions={regions}
         hotspots={hotspots}
         selected={selected}
         onSelect={setSelected}

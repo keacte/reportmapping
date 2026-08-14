@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 DATA_FILE = Path(__file__).parent / "data" / "systems.json"
 SHIP_FILE = Path(__file__).parent / "data" / "ship_types.json"
+REGION_FILE = Path(__file__).parent / "data" / "regions.json"
 
 # Known space = New Eden cluster (region IDs below 11000000). Anything above is
 # wormhole / abyssal / Jove space which sits far outside the main cluster.
@@ -20,18 +21,21 @@ KNOWN_SPACE_MAX_REGION = 11000000
 
 _SYSTEMS: dict[str, list] = {}
 _SHIP_TYPES: dict[str, str] = {}
+_REGION_NAMES: dict[str, str] = {}
 
 
 def _load() -> None:
-    global _SYSTEMS, _SHIP_TYPES
+    global _SYSTEMS, _SHIP_TYPES, _REGION_NAMES
     if _SYSTEMS:
         return
     with open(DATA_FILE, encoding="utf-8") as fh:
         _SYSTEMS = json.load(fh)
     with open(SHIP_FILE, encoding="utf-8") as fh:
         _SHIP_TYPES = json.load(fh)
-    logger.info("Loaded %d solar systems and %d ship types from SDE cache",
-                len(_SYSTEMS), len(_SHIP_TYPES))
+    with open(REGION_FILE, encoding="utf-8") as fh:
+        _REGION_NAMES = json.load(fh)
+    logger.info("Loaded %d systems, %d ship types, %d regions from SDE cache",
+                len(_SYSTEMS), len(_SHIP_TYPES), len(_REGION_NAMES))
 
 
 def ship_group(type_id) -> str | None:
@@ -59,4 +63,26 @@ def background_systems() -> list[dict]:
     for name, (x, z, sec, reg) in _SYSTEMS.items():
         if reg < KNOWN_SPACE_MAX_REGION:
             out.append({"name": name, "x": x, "z": z, "security": sec})
+    return out
+
+
+def region_centroids() -> list[dict]:
+    """Region label anchors: mean 2D position of each known-space region's systems."""
+    _load()
+    acc: dict[int, list] = {}
+    for _name, (x, z, _sec, reg) in _SYSTEMS.items():
+        if reg >= KNOWN_SPACE_MAX_REGION:
+            continue
+        a = acc.get(reg)
+        if a is None:
+            a = acc[reg] = [0.0, 0.0, 0]
+        a[0] += x
+        a[1] += z
+        a[2] += 1
+    out = []
+    for reg, (sx, sz, n) in acc.items():
+        name = _REGION_NAMES.get(str(reg))
+        if not name or n == 0:
+            continue
+        out.append({"name": name, "x": round(sx / n), "z": round(sz / n), "systems": n})
     return out

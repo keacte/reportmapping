@@ -32,6 +32,13 @@ async def universe_systems():
     return {"count": len(systems), "systems": systems}
 
 
+@api_router.get("/universe/regions")
+async def universe_regions():
+    """Known-space region label anchors (centroids) from the CCP SDE."""
+    regions = eve_sde.region_centroids()
+    return {"count": len(regions), "regions": regions}
+
+
 @api_router.get("/reports/recent")
 async def recent_reports():
     """Recent NPSI fleet reports for the roam browser."""
