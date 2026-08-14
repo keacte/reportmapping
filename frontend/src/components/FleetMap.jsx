@@ -134,7 +134,7 @@ export default function FleetMap() {
         setReplayLatest(count > 0 ? seg.kills[count - 1].system : null);
         setReplay({
           segIndex, total: segments.length, fleetName: seg.name, color: seg.color,
-          progress: p, count, totalKills: seg.kills.length,
+          progress: p, count, totalKills: seg.kills.length, vtMs: vt,
           timeLabel: new Date(vt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         });
         if (p < 1) {
@@ -454,7 +454,7 @@ export default function FleetMap() {
           </div>
           {showTimeline && (
             <div className="h-32 px-2 py-1">
-              <Timeline kills={report.kills} />
+              <Timeline kills={report.kills} playheadTime={replay?.vtMs} playheadColor={replay?.color} />
             </div>
           )}
         </motion.div>
