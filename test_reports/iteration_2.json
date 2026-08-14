@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 2 testing (Kill Timeline, Ship Breakdown, Recent Roams). 16/16 backend pytest tests pass and full frontend Playwright flow passes: timeline panel + toggle, ships tab with Ship Classes Killed + Juiciest Targets (juicy focus does not crash), Recent Roams open/close/pick, load-by-id, killmails click-to-filter, clear filter, members. Regression flows intact.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Timeline (bottom center)", "issues": ["recharts logs a brief 'width(-1)/height(-1)' warning on first mount and after toggling show/hide before container measures. Cosmetic only; chart renders correctly. Could be silenced by giving the ResponsiveContainer an explicit min-height."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Timeline.jsx: recharts ResponsiveContainer briefly measures to -1 on first paint (see console warnings). Wrap in a fixed-height div (e.g. h-40) or add minHeight to ResponsiveContainer to eliminate the warning.",
+    "server.py /reports/recent has no in-memory caching; every call proxies i.npsi.rocks. Consider a short TTL cache (30-60s) to protect the upstream and improve latency for the Recent Roams dropdown.",
+    "shipBreakdown tie-breaks on ISK desc which is sensible, but ties on both would be non-deterministic across runs; acceptable for MVP."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. Live NPSI API used (report 622 confirmed present in /reports/recent at test time).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend tests live at /app/backend/tests/backend_test.py (pytest, uses REACT_APP_BACKEND_URL). New Iteration-2 test classes: TestShipBreakdown (asserts sums==totalKills==65, Capsule=27, Assault Frigate=10, ship.group populated) and TestRecentReports (shape + hostLogo absolute + 622 skip-if-aged-out). Frontend testids verified: timeline-panel, kill-timeline, timeline-toggle-btn, tab-ships, ships-panel, juicy-<killId>, recent-toggle-btn, recent-roams-panel, recent-report-<id>, recent-close-btn, kill-system-<killId>, clear-filter-btn."
+}

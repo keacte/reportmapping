@@ -29,14 +29,15 @@ Visualize an EVE Online NPSI fleet roam report as an interactive New Eden star m
 - Fleet summary panel: name, host, date, duration, FC, stat tiles (Kills/ISK/Fleet Size/Systems), Top Damage & Final Blows badges, Roam-by-Region bars
 - Killmail feed with ship render/victim/value/system/region/time; click system to filter; Members roster tab
 - Load any report by ID; external links to zKillboard + npsi capsuleer/host pages
-- Verified: backend 100%, frontend 100% (testing agent iteration_1)
+- **Kill Timeline** histogram (kills per 5-min + cumulative ISK line, recharts) under the map, collapsible
+- **Ship Breakdown** tab: ship classes killed (grouped via SDE invTypes/invGroups) + Juiciest Targets list
+- **Recent Roams** browser: top-bar dropdown listing recent NPSI reports (with 30d stats), one-click load
+- Verified: backend 100%, frontend 100% (testing agent iteration_1 & iteration_2)
 
 ## Backlog (P1/P2)
-- P1: Kill activity timeline / histogram (kills per 5-min window + cumulative ISK)
 - P1: Highlight/animate the roam route sequentially (playback of the roam over time)
-- P2: Brief server-side caching of NPSI responses
-- P2: Ship-class breakdown of what the fleet killed
-- P2: Compare multiple reports / recent reports browser
+- P2: Brief server-side caching of NPSI responses (recent + report)
+- P2: Compare multiple reports side by side
 
 ## Next Tasks
 - Await user feedback on report 622 mapping; add timeline or route playback if requested

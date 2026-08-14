@@ -13,6 +13,8 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 NPSI_API = "https://i.npsi.rocks/reports/api/fleet"
+NPSI_HOME = "https://i.npsi.rocks/events/api/home"
+NPSI_MEDIA = "https://media.npsi.rocks"
 
 app = FastAPI(title="New Eden Fleet Cartographer")
 api_router = APIRouter(prefix="/api")
@@ -28,6 +30,49 @@ async def universe_systems():
     """Known-space solar systems (from the CCP SDE) for the star map backdrop."""
     systems = eve_sde.background_systems()
     return {"count": len(systems), "systems": systems}
+
+
+@api_router.get("/reports/recent")
+async def recent_reports():
+    """Recent NPSI fleet reports for the roam browser."""
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            resp = await client.get(NPSI_HOME, headers={"Accept": "application/json"})
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to reach NPSI: {exc}")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"NPSI returned {resp.status_code}")
+    try:
+        data = resp.json()
+    except ValueError:
+        raise HTTPException(status_code=502, detail="NPSI response was not JSON")
+
+    out = []
+    for r in data.get("recent_fleet_reports", []) or []:
+        url = r.get("reportUrl") or ""
+        rid = None
+        for part in url.strip("/").split("/"):
+            if part.isdigit():
+                rid = int(part)
+        if rid is None:
+            continue
+        logo = r.get("hostLogo")
+        out.append({
+            "id": rid,
+            "name": r.get("eventName"),
+            "date": r.get("eventStart"),
+            "fc": r.get("fc"),
+            "host": r.get("hostName"),
+            "hostLogo": (NPSI_MEDIA + logo) if logo and logo.startswith("/") else logo,
+            "iskHuman": r.get("destroyedValueHuman"),
+            "isk": r.get("destroyedValue") or 0,
+        })
+    return {"reports": out, "stats": {
+        "kills30d": data.get("kills_30d"),
+        "isk30d": data.get("isk_30d"),
+        "hostCount": data.get("hostCount"),
+        "fleets7d": data.get("fleets_7d"),
+    }}
 
 
 def _pilot(node: dict | None) -> dict | None:
@@ -79,6 +124,7 @@ async def get_report(report_id: int):
             unmapped.add(sys_name)
 
         ship = k.get("ship") or {}
+        ship_group = eve_sde.ship_group(ship.get("id"))
         record = {
             "killId": k.get("killId"),
             "timestamp": k.get("timestamp"),
@@ -87,7 +133,7 @@ async def get_report(report_id: int):
             "system": sys_name,
             "region": region,
             "security": coord["security"] if coord else None,
-            "ship": {"id": ship.get("id"), "name": ship.get("name")},
+            "ship": {"id": ship.get("id"), "name": ship.get("name"), "group": ship_group},
             "victim": _pilot(k.get("victim")),
             "topDamage": _pilot(k.get("topDamage")),
             "finalBlow": _pilot(k.get("finalBlow")),
@@ -114,6 +160,17 @@ async def get_report(report_id: int):
 
     fleet = data.get("fleet") or {}
 
+    # Ship-class breakdown of what the fleet killed (grouped via the SDE).
+    groups: dict[str, dict] = {}
+    for rec in kill_records:
+        gname = rec["ship"]["group"] or "Unknown"
+        g = groups.get(gname)
+        if g is None:
+            g = groups[gname] = {"group": gname, "count": 0, "isk": 0}
+        g["count"] += 1
+        g["isk"] += rec["value"]
+    ship_breakdown = sorted(groups.values(), key=lambda d: (d["count"], d["isk"]), reverse=True)
+
     return {
         "fleet": {
             "id": fleet.get("id"),
@@ -130,6 +187,7 @@ async def get_report(report_id: int):
         "topFinalBlow": _pilot(data.get("topFinalBlow")),
         "regionStats": data.get("regionStats", []),
         "totalKills": len(kill_records),
+        "shipBreakdown": ship_breakdown,
         "hotspots": sorted(hotspots.values(), key=lambda h: h["iskDestroyed"], reverse=True),
         "kills": kill_records,
         "members": data.get("members", []),

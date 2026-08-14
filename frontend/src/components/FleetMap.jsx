@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Rocket, Crosshair, Users, Radar, Zap, Skull, ExternalLink, Search, MapPin, X } from "lucide-react";
+import { Rocket, Crosshair, Users, Radar, Zap, Skull, ExternalLink, Search, MapPin, X, History } from "lucide-react";
 import StarMap from "@/components/StarMap";
+import Timeline from "@/components/Timeline";
+import RecentRoams from "@/components/RecentRoams";
 import {
   portrait, shipRender, capsuleerUrl, killUrl, hostUrl,
   formatIsk, formatTime, secColor, heatColor,
@@ -20,9 +22,17 @@ export default function FleetMap() {
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState("kills");
   const [tip, setTip] = useState(null);
+  const [recent, setRecent] = useState([]);
+  const [recentStats, setRecentStats] = useState(null);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(true);
 
   useEffect(() => {
     axios.get(`${API}/universe/systems`).then((r) => setBackground(r.data.systems)).catch(() => {});
+    axios.get(`${API}/reports/recent`).then((r) => {
+      setRecent(r.data.reports || []);
+      setRecentStats(r.data.stats || null);
+    }).catch(() => {});
   }, []);
 
   const loadReport = useCallback((id) => {
@@ -98,6 +108,14 @@ export default function FleetMap() {
         </div>
 
         <form onSubmit={submit} className="pointer-events-auto glass flex items-center gap-2 rounded-sm px-2 py-1.5" data-testid="report-search-form">
+          <button
+            type="button"
+            data-testid="recent-toggle-btn"
+            onClick={() => setRecentOpen((v) => !v)}
+            className={`flex items-center gap-1.5 rounded-none border px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-all ${recentOpen ? "border-cyan-400/70 bg-cyan-500/20 text-cyan-200" : "border-white/15 bg-black/40 text-slate-300 hover:border-cyan-400/50 hover:text-cyan-300"}`}
+          >
+            <History className="h-3.5 w-3.5" /> Recent
+          </button>
           <span className="pl-1 font-mono text-[10px] uppercase tracking-widest text-slate-400">Report</span>
           <input
             data-testid="report-id-input"
@@ -115,6 +133,15 @@ export default function FleetMap() {
           </button>
         </form>
       </div>
+
+      <RecentRoams
+        open={recentOpen}
+        onClose={() => setRecentOpen(false)}
+        reports={recent}
+        stats={recentStats}
+        currentId={reportId}
+        onPick={(id) => { setInputId(String(id)); setReportId(String(id)); setRecentOpen(false); }}
+      />
 
       {/* Left summary panel */}
       {f && (
@@ -189,14 +216,14 @@ export default function FleetMap() {
           data-testid="feed-panel"
         >
           <div className="flex items-center border-b border-white/10">
-            {[["kills", "Killmails"], ["members", "Members"]].map(([k, label]) => (
+            {[["kills", "Killmails", report.totalKills], ["ships", "Ships", report.shipBreakdown?.length || 0], ["members", "Members", report.members?.length || 0]].map(([k, label, count]) => (
               <button
                 key={k}
                 data-testid={`tab-${k}`}
                 onClick={() => setTab(k)}
-                className={`flex-1 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-widest transition-colors ${tab === k ? "text-cyan-300 neon-text border-b-2 border-cyan-400" : "text-slate-500 hover:text-slate-300"}`}
+                className={`flex-1 px-3 py-2.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${tab === k ? "text-cyan-300 neon-text border-b-2 border-cyan-400" : "text-slate-500 hover:text-slate-300"}`}
               >
-                {label} {k === "kills" ? `(${report.totalKills})` : `(${report.members?.length || 0})`}
+                {label} ({count})
               </button>
             ))}
           </div>
@@ -211,13 +238,15 @@ export default function FleetMap() {
           )}
 
           <div className="thin-scroll flex-1 overflow-y-auto">
-            {tab === "kills" ? (
+            {tab === "kills" && (
               <div className="divide-y divide-white/5">
                 {visibleKills.map((k) => (
                   <KillRow key={k.killId} k={k} onFocus={() => setSelected(k.system)} />
                 ))}
               </div>
-            ) : (
+            )}
+            {tab === "ships" && <ShipsPanel report={report} onFocus={setSelected} />}
+            {tab === "members" && (
               <div className="grid grid-cols-1 gap-1 p-2">
                 {(report.members || []).map((m) => (
                   <a key={m.id} href={capsuleerUrl(m.id)} target="_blank" rel="noopener noreferrer"
@@ -230,6 +259,33 @@ export default function FleetMap() {
             )}
           </div>
         </motion.aside>
+      )}
+
+      {/* Kill timeline (bottom center) */}
+      {report && report.kills?.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="absolute bottom-4 left-[24rem] right-[25.5rem] z-20 glass rounded-sm"
+          data-testid="timeline-panel"
+        >
+          <div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-400">Kill Activity · 5-min · cumulative ISK</div>
+            <button
+              data-testid="timeline-toggle-btn"
+              onClick={() => setShowTimeline((v) => !v)}
+              className="font-mono text-[10px] uppercase tracking-wider text-slate-400 hover:text-cyan-300"
+            >
+              {showTimeline ? "hide" : "show"}
+            </button>
+          </div>
+          {showTimeline && (
+            <div className="h-32 px-2 py-1">
+              <Timeline kills={report.kills} />
+            </div>
+          )}
+        </motion.div>
       )}
 
       {/* Legend */}
@@ -297,6 +353,46 @@ function PilotBadge({ title, pilot, icon: Icon }) {
         <div className="truncate font-display text-sm font-semibold text-white">{pilot.name}</div>
       </div>
     </a>
+  );
+}
+
+function ShipsPanel({ report, onFocus }) {
+  const breakdown = report.shipBreakdown || [];
+  const maxCount = Math.max(...breakdown.map((b) => b.count), 1);
+  const juiciest = [...(report.kills || [])].sort((a, b) => (b.value || 0) - (a.value || 0)).slice(0, 6);
+  return (
+    <div className="p-3" data-testid="ships-panel">
+      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-400">Ship Classes Killed</div>
+      <div className="space-y-1.5">
+        {breakdown.map((b) => (
+          <div key={b.group} className="font-mono text-xs" data-testid={`shipgroup-${b.group}`}>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-200">{b.group}</span>
+              <span className="text-slate-400">{b.count} · {formatIsk(b.isk)}</span>
+            </div>
+            <div className="mt-0.5 h-1 w-full bg-white/5">
+              <div className="h-full" style={{ width: `${(b.count / maxCount) * 100}%`, background: heatColor(b.count / maxCount) }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-2 mt-5 font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/80">Juiciest Targets</div>
+      <div className="space-y-1">
+        {juiciest.map((k) => (
+          <div key={k.killId} className="flex items-center gap-2.5 border border-white/10 bg-white/[0.02] p-1.5" data-testid={`juicy-${k.killId}`}>
+            <a href={killUrl(k.killId)} target="_blank" rel="noopener noreferrer" className="shrink-0">
+              <img src={shipRender(k.ship.id, 64)} alt="" className="h-9 w-9 border border-white/10 bg-black/40" />
+            </a>
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-display text-sm font-semibold text-white">{k.ship.name}</div>
+              <button onClick={() => onFocus(k.system)} className="font-mono text-[10px] text-slate-400 hover:text-cyan-300">{k.system} · {k.region}</button>
+            </div>
+            <span className="shrink-0 font-mono text-xs font-semibold text-amber-300">{k.valueHuman}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
