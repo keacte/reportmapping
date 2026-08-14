@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Rocket, Crosshair, Users, Zap, Skull, ExternalLink, Search, MapPin, X, History } from "lucide-react";
+import { Rocket, Crosshair, Users, Zap, Skull, ExternalLink, Search, MapPin, X, History, Play, Square } from "lucide-react";
 import StarMap from "@/components/StarMap";
 import Timeline from "@/components/Timeline";
 import RecentRoams from "@/components/RecentRoams";
@@ -29,6 +29,10 @@ export default function FleetMap() {
   const [showTimeline, setShowTimeline] = useState(true);
   const [focusRegion, setFocusRegion] = useState(null);
   const [groupIds, setGroupIds] = useState([]);
+  const [replay, setReplay] = useState(null);        // null | {segIndex,total,fleetName,color,timeLabel,progress,count,totalKills}
+  const [replayHotspots, setReplayHotspots] = useState([]);
+  const [replayLatest, setReplayLatest] = useState(null);
+  const replayRef = useRef({ raf: 0, active: false });
 
   const regionByName = useMemo(() => {
     const m = {};
@@ -70,6 +74,87 @@ export default function FleetMap() {
     setGroupIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }, []);
 
+  // Chronological segments to replay: one per fleet (combined) or one for the whole roam.
+  const segments = useMemo(() => {
+    const kills = (report?.kills || []).filter((k) => k.x != null && k.timestamp);
+    if (!kills.length) return [];
+    const byTime = (a, b) => new Date(a.timestamp) - new Date(b.timestamp);
+    if (report.combined && report.fleets?.length) {
+      return report.fleets
+        .map((fl) => ({ name: fl.name, color: fl.color, kills: kills.filter((k) => k.fleetId === fl.id).sort(byTime) }))
+        .filter((s) => s.kills.length);
+    }
+    return [{ name: report.fleet?.name, color: "#a855f7", kills: [...kills].sort(byTime) }];
+  }, [report]);
+
+  const stopReplay = useCallback(() => {
+    replayRef.current.active = false;
+    if (replayRef.current.raf) cancelAnimationFrame(replayRef.current.raf);
+    setReplay(null);
+    setReplayHotspots([]);
+    setReplayLatest(null);
+  }, []);
+
+  const startReplay = useCallback(() => {
+    if (!segments.length) return;
+    const DURATION = 30000; // 30s per report/roam
+    replayRef.current.active = true;
+
+    const buildRevealed = (kills, count) => {
+      const m = {};
+      for (let i = 0; i < count; i++) {
+        const k = kills[i];
+        let h = m[k.system];
+        if (!h) h = m[k.system] = { system: k.system, region: k.region, x: k.x, z: k.z, security: k.security, kills: 0, iskDestroyed: 0, killIds: [] };
+        h.kills += 1;
+        h.iskDestroyed += k.value || 0;
+        h.killIds.push(k.killId);
+      }
+      return Object.values(m);
+    };
+
+    const playSegment = (segIndex) => {
+      if (!replayRef.current.active) return;
+      const seg = segments[segIndex];
+      const xs = seg.kills.map((k) => k.x);
+      const zs = seg.kills.map((k) => k.z);
+      setFocusRegion({ minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs), nonce: Date.now() });
+      const realStart = new Date(seg.kills[0].timestamp).getTime();
+      const realEnd = new Date(seg.kills[seg.kills.length - 1].timestamp).getTime();
+      const span = Math.max(realEnd - realStart, 1);
+      const t0 = performance.now();
+
+      const tick = (now) => {
+        if (!replayRef.current.active) return;
+        const p = Math.min((now - t0) / DURATION, 1);
+        const vt = realStart + p * span;
+        let count = 0;
+        while (count < seg.kills.length && new Date(seg.kills[count].timestamp).getTime() <= vt) count += 1;
+        setReplayHotspots(buildRevealed(seg.kills, count));
+        setReplayLatest(count > 0 ? seg.kills[count - 1].system : null);
+        setReplay({
+          segIndex, total: segments.length, fleetName: seg.name, color: seg.color,
+          progress: p, count, totalKills: seg.kills.length,
+          timeLabel: new Date(vt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        });
+        if (p < 1) {
+          replayRef.current.raf = requestAnimationFrame(tick);
+        } else if (segIndex + 1 < segments.length) {
+          playSegment(segIndex + 1);
+        } else {
+          setTimeout(() => stopReplay(), 900);
+        }
+      };
+      replayRef.current.raf = requestAnimationFrame(tick);
+    };
+
+    playSegment(0);
+  }, [segments, stopReplay]);
+
+  // Stop any replay when the report changes or on unmount.
+  useEffect(() => () => stopReplay(), [stopReplay]);
+  useEffect(() => { stopReplay(); }, [report, stopReplay]);
+
   const hotspots = useMemo(() => report?.hotspots || [], [report]);
 
   const visibleKills = useMemo(() => {
@@ -98,8 +183,10 @@ export default function FleetMap() {
       <StarMap
         background={background}
         regions={regions}
-        hotspots={hotspots}
+        hotspots={replay ? replayHotspots : hotspots}
         selected={selected}
+        highlight={replay ? replayLatest : null}
+        autoFocus={!replay}
         focusRegion={focusRegion}
         onSelect={setSelected}
         onHover={onHover}
@@ -316,6 +403,27 @@ export default function FleetMap() {
         </motion.aside>
       )}
 
+      {/* Replay HUD (top center) */}
+      {replay && (
+        <div className="pointer-events-none absolute left-1/2 top-20 z-30 w-[26rem] -translate-x-1/2 glass rounded-2xl px-4 py-2.5" data-testid="replay-hud">
+          <div className="flex items-center gap-2.5">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: replay.color, boxShadow: `0 0 10px ${replay.color}` }} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-display text-sm font-bold text-white">{replay.fleetName}</span>
+                <span className="shrink-0 font-mono text-[11px] text-purple-300">{replay.timeLabel}</span>
+              </div>
+              <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/10">
+                <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${Math.round(replay.progress * 100)}%`, background: replay.color }} />
+              </div>
+            </div>
+            <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-slate-400">
+              {replay.count}/{replay.totalKills}{replay.total > 1 ? ` · roam ${replay.segIndex + 1}/${replay.total}` : ""}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Kill timeline (bottom center) */}
       {report && report.kills?.length > 0 && (
         <motion.div
@@ -327,13 +435,22 @@ export default function FleetMap() {
         >
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5">
             <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400">Kill Activity · 5-min · cumulative ISK</div>
-            <button
-              data-testid="timeline-toggle-btn"
-              onClick={() => setShowTimeline((v) => !v)}
-              className="font-mono text-[10px] uppercase tracking-wider text-slate-400 hover:text-purple-300"
-            >
-              {showTimeline ? "hide" : "show"}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                data-testid="replay-roam-btn"
+                onClick={() => (replay ? stopReplay() : startReplay())}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-all ${replay ? "border-red-400/60 bg-red-500/15 text-red-200" : "border-purple-400/50 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 hover:shadow-[0_0_12px_rgba(168,85,247,0.35)]"}`}
+              >
+                {replay ? <><Square className="h-3 w-3" /> Stop</> : <><Play className="h-3 w-3" /> Replay Roam</>}
+              </button>
+              <button
+                data-testid="timeline-toggle-btn"
+                onClick={() => setShowTimeline((v) => !v)}
+                className="font-mono text-[10px] uppercase tracking-wider text-slate-400 hover:text-purple-300"
+              >
+                {showTimeline ? "hide" : "show"}
+              </button>
+            </div>
           </div>
           {showTimeline && (
             <div className="h-32 px-2 py-1">

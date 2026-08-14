@@ -6,14 +6,14 @@ import { heatColor, secColorAlpha } from "@/lib/eve";
 // - background: all known-space systems (faint dots) from the CCP SDE
 // - regions: region label anchors (centroids)
 // - hotspots: systems where the fleet got kills (glowing, sized by ISK)
-export default function StarMap({ background, regions, hotspots, selected, focusRegion, onSelect, onHover }) {
+export default function StarMap({ background, regions, hotspots, selected, highlight, focusRegion, autoFocus = true, onSelect, onHover }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const stateRef = useRef({ proj: null, quad: null, transform: d3.zoomIdentity, size: { w: 0, h: 0 } });
   const zoomRef = useRef(null);
-  const dataRef = useRef({ background, regions, hotspots, selected });
+  const dataRef = useRef({ background, regions, hotspots, selected, highlight });
 
-  dataRef.current = { background, regions, hotspots, selected };
+  dataRef.current = { background, regions, hotspots, selected, highlight };
 
   const project = useCallback((x, z) => {
     const p = stateRef.current.proj;
@@ -28,7 +28,7 @@ export default function StarMap({ background, regions, hotspots, selected, focus
     const { w, h } = stateRef.current.size;
     const dpr = window.devicePixelRatio || 1;
     const t = stateRef.current.transform;
-    const { background: bg, regions: rg, hotspots: hs, selected: sel } = dataRef.current;
+    const { background: bg, regions: rg, hotspots: hs, selected: sel, highlight: hl } = dataRef.current;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
@@ -84,7 +84,7 @@ export default function StarMap({ background, regions, hotspots, selected, focus
         const intensity = d.iskDestroyed / maxIsk;
         const r = 5 + Math.sqrt(d.iskDestroyed / maxIsk) * 16;
         const col = heatColor(intensity);
-        const isSel = sel === d.system;
+        const isSel = sel === d.system || hl === d.system;
 
         // glow
         const g = ctx.createRadialGradient(px, py, 0, px, py, r * 2.4);
@@ -266,14 +266,14 @@ export default function StarMap({ background, regions, hotspots, selected, focus
       stateRef.current.quad = d3.quadtree().x((p) => p.px).y((p) => p.py).addAll(pts);
       requestDraw();
     }
-  }, [hotspots, regions, selected, project, requestDraw]);
+  }, [hotspots, regions, selected, highlight, project, requestDraw]);
 
-  // Re-frame the cluster whenever a new report's hotspots load
+  // Re-frame the cluster whenever a new report's hotspots load (unless replay drives the view)
   useEffect(() => {
-    if (stateRef.current.proj && hotspots && hotspots.length) {
+    if (autoFocus && stateRef.current.proj && hotspots && hotspots.length) {
       focusHotspots(true);
     }
-  }, [hotspots, focusHotspots]);
+  }, [hotspots, autoFocus, focusHotspots]);
 
   // Zoom to a region when requested from the report panel
   useEffect(() => {
