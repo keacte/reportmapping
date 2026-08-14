@@ -6,7 +6,7 @@ import { heatColor, secColor } from "@/lib/eve";
 // - background: all known-space systems (faint dots) from the CCP SDE
 // - regions: region label anchors (centroids)
 // - hotspots: systems where the fleet got kills (glowing, sized by ISK)
-export default function StarMap({ background, regions, hotspots, selected, onSelect, onHover }) {
+export default function StarMap({ background, regions, hotspots, selected, focusRegion, onSelect, onHover }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const stateRef = useRef({ proj: null, quad: null, transform: d3.zoomIdentity, size: { w: 0, h: 0 } });
@@ -115,28 +115,45 @@ export default function StarMap({ background, regions, hotspots, selected, onSel
     requestAnimationFrame(draw);
   }, [draw]);
 
-  // Smoothly frame the hotspot cluster within the viewport.
-  const focusHotspots = useCallback((animate = true) => {
+  // Frame a base-coord bounding box into the viewport.
+  const frameBaseBox = useCallback((minX, maxX, minY, maxY, pad = 0.45, animate = true) => {
     const canvas = canvasRef.current;
     const zoom = zoomRef.current;
-    const p = stateRef.current.proj;
-    const hs = dataRef.current.hotspots;
-    if (!canvas || !zoom || !p || !hs || !hs.length) return;
-    const pts = hs.map((d) => project(d.x, d.z));
-    const xs = pts.map((q) => q[0]);
-    const ys = pts.map((q) => q[1]);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    if (!canvas || !zoom) return;
     const { w, h } = stateRef.current.size;
     const bw = Math.max(maxX - minX, 1);
     const bh = Math.max(maxY - minY, 1);
-    let k = Math.min(w / bw, h / bh) * 0.45;
-    k = Math.max(0.4, Math.min(28, k));
+    let k = Math.min(w / bw, h / bh) * pad;
+    k = Math.max(0.4, Math.min(40, k));
     const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
     const t = d3.zoomIdentity.translate(w / 2 - cx * k, h / 2 - cy * k).scale(k);
     const s = d3.select(canvas);
     (animate ? s.transition().duration(750) : s).call(zoom.transform, t);
-  }, [project]);
+  }, []);
+
+  // Smoothly frame the hotspot cluster within the viewport.
+  const focusHotspots = useCallback((animate = true) => {
+    const p = stateRef.current.proj;
+    const hs = dataRef.current.hotspots;
+    if (!p || !hs || !hs.length) return;
+    const pts = hs.map((d) => project(d.x, d.z));
+    const xs = pts.map((q) => q[0]);
+    const ys = pts.map((q) => q[1]);
+    frameBaseBox(Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys), 0.45, animate);
+  }, [project, frameBaseBox]);
+
+  // Frame an arbitrary world-coord (schematic) bounding box, e.g. a region.
+  const focusWorldBox = useCallback((b, animate = true) => {
+    const p = stateRef.current.proj;
+    if (!p || !b) return;
+    const c1 = project(b.minX, b.minZ);
+    const c2 = project(b.maxX, b.maxZ);
+    frameBaseBox(
+      Math.min(c1[0], c2[0]), Math.max(c1[0], c2[0]),
+      Math.min(c1[1], c2[1]), Math.max(c1[1], c2[1]),
+      0.6, animate,
+    );
+  }, [project, frameBaseBox]);
 
   // Setup projection, sizing, zoom, and interaction
   useEffect(() => {
@@ -253,6 +270,13 @@ export default function StarMap({ background, regions, hotspots, selected, onSel
       focusHotspots(true);
     }
   }, [hotspots, focusHotspots]);
+
+  // Zoom to a region when requested from the report panel
+  useEffect(() => {
+    if (stateRef.current.proj && focusRegion) {
+      focusWorldBox(focusRegion, true);
+    }
+  }, [focusRegion, focusWorldBox]);
 
   return (
     <div ref={wrapRef} className="absolute inset-0" data-testid="star-map">

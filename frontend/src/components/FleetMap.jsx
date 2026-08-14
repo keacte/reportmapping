@@ -27,6 +27,13 @@ export default function FleetMap() {
   const [recentStats, setRecentStats] = useState(null);
   const [recentOpen, setRecentOpen] = useState(false);
   const [showTimeline, setShowTimeline] = useState(true);
+  const [focusRegion, setFocusRegion] = useState(null);
+
+  const regionByName = useMemo(() => {
+    const m = {};
+    (regions || []).forEach((r) => { m[r.name] = r; });
+    return m;
+  }, [regions]);
 
   useEffect(() => {
     axios.get(`${API}/universe/systems`).then((r) => setBackground(r.data.systems)).catch(() => {});
@@ -78,6 +85,7 @@ export default function FleetMap() {
         regions={regions}
         hotspots={hotspots}
         selected={selected}
+        focusRegion={focusRegion}
         onSelect={setSelected}
         onHover={onHover}
       />
@@ -172,20 +180,28 @@ export default function FleetMap() {
           </div>
 
           <div className="mt-5">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400">Roam by Region</div>
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-purple-400">Roam by Region · <span className="text-slate-500">click to zoom</span></div>
             <div className="space-y-1.5">
               {(report.regionStats || []).map((r, i) => {
                 const max = Math.max(...report.regionStats.map((x) => x.killmails), 1);
+                const b = regionByName[r.regionName];
                 return (
-                  <div key={i} className="font-mono text-xs" data-testid={`region-${r.regionName}`}>
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={!b}
+                    onClick={() => b && setFocusRegion({ ...b, nonce: Date.now() })}
+                    className="block w-full text-left font-mono text-xs disabled:cursor-default group/region"
+                    data-testid={`region-${r.regionName}`}
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-200">{r.regionName}</span>
+                      <span className="text-slate-200 transition-colors group-hover/region:text-purple-300">{r.regionName}</span>
                       <span className="text-slate-400">{r.killmails} · {r.destroyedValueHuman}</span>
                     </div>
                     <div className="mt-0.5 h-1 w-full bg-white/5">
-                      <div className="h-full" style={{ width: `${(r.killmails / max) * 100}%`, background: heatColor(r.killmails / max) }} />
+                      <div className="h-full transition-all group-hover/region:brightness-125" style={{ width: `${(r.killmails / max) * 100}%`, background: heatColor(r.killmails / max) }} />
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

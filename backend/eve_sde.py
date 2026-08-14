@@ -67,22 +67,34 @@ def background_systems() -> list[dict]:
 
 
 def region_centroids() -> list[dict]:
-    """Region label anchors: mean 2D position of each known-space region's systems."""
+    """Region label anchors + bounds (2D schematic) for each known-space region."""
     _load()
-    acc: dict[int, list] = {}
+    acc: dict[int, dict] = {}
     for _name, (x, z, _sec, reg) in _SYSTEMS.items():
         if reg >= KNOWN_SPACE_MAX_REGION:
             continue
         a = acc.get(reg)
         if a is None:
-            a = acc[reg] = [0.0, 0.0, 0]
-        a[0] += x
-        a[1] += z
-        a[2] += 1
+            a = acc[reg] = {"sx": 0.0, "sz": 0.0, "n": 0,
+                            "minX": x, "maxX": x, "minZ": z, "maxZ": z}
+        a["sx"] += x
+        a["sz"] += z
+        a["n"] += 1
+        a["minX"] = min(a["minX"], x)
+        a["maxX"] = max(a["maxX"], x)
+        a["minZ"] = min(a["minZ"], z)
+        a["maxZ"] = max(a["maxZ"], z)
     out = []
-    for reg, (sx, sz, n) in acc.items():
+    for reg, a in acc.items():
         name = _REGION_NAMES.get(str(reg))
-        if not name or n == 0:
+        if not name or a["n"] == 0:
             continue
-        out.append({"name": name, "x": round(sx / n), "z": round(sz / n), "systems": n})
+        out.append({
+            "name": name,
+            "x": round(a["sx"] / a["n"]),
+            "z": round(a["sz"] / a["n"]),
+            "systems": a["n"],
+            "minX": round(a["minX"]), "maxX": round(a["maxX"]),
+            "minZ": round(a["minZ"]), "maxZ": round(a["maxZ"]),
+        })
     return out
